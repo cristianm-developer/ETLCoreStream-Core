@@ -1,7 +1,7 @@
 {
-  "name": "ETL CoreStream",
+  "name": "@etl-corestream/core",
   "version": "1.0.0",
-  "description": "ETL Core Services",
+  "description": "ETL Core Services - Modular ETL orchestration with XState and Signals",
   "license": "ISC",
   "author": "Cristian Marin",
   "type": "module",
@@ -9,31 +9,39 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     }
   },
   "files": [
     "dist"
   ],
+  "sideEffects": false,
   "scripts": {
     "test": "vitest",
-    "build": "vite build"
+    "build": "vite build",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "papaparse": "^5.5.3",
+    "streamsaver": "^2.0.6"
+  },
+  "peerDependencies": {
     "@preact/signals-core": "^1.14.1",
     "@xstate/graph": "^3.0.4",
-    "papaparse": "^5.5.3",
     "rxjs": "^7.8.2",
-    "streamsaver": "^2.0.6",
-    "vite": "^8.0.8",
     "xstate": "^5.30.0"
   },
   "devDependencies": {
+    "@preact/signals-core": "^1.14.1",
     "@types/node": "^25.6.0",
     "@types/papaparse": "^5.5.2",
+    "@xstate/graph": "^3.0.4",
+    "rxjs": "^7.8.2",
     "typescript": "^6.0.2",
     "vite": "^8.0.8",
-    "vitest": "^4.1.4"
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^4.1.4",
+    "xstate": "^5.30.0"
   }
 }

@@ -27,6 +27,10 @@ export class ViewerModule implements IViewerModule {
         this.logger.log('ViewerModule initialized', 'debug', 'constructor', this.id);
     }    
 
+    getTotalPages = (totalRows: number) => {
+        return Math.ceil(totalRows / this.options.defaultPageSize) ?? 1;
+    }
+
     getRowsWithPagination = async (persistenceModule: IPersistenceModule, metrics: FileMetrics,  filter?: RowFilter, pageNumber?: number, signal?: AbortSignal) => {
         try {
             this.logger.log(`Fetching rows with pagination - page: ${pageNumber}, pageSize: ${this.options.defaultPageSize}`, 'debug', 'getRowsWithPagination', this.id);

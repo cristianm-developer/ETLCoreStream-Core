@@ -14,7 +14,6 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
     private options: PersistenceModuleOptions;
 
     private db: IDBDatabase | null = null;
-    private maxStorageBytes: number = 50 * 1024 * 1024;
 
     private progress = new Signal<number|null>(null);
 

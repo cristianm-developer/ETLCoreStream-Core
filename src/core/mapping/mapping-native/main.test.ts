@@ -320,7 +320,7 @@ describe('MappingModule', () => {
                 preserveOriginalValue: true
             });
 
-            await expect(customModule.handleRemap(layout, row, null))
+            await expect(customModule.handleRemap(layout, row, undefined))
             .rejects
             .toThrow('Mapping Error: Cannot be mapped');
 
@@ -368,7 +368,8 @@ describe('MappingModule', () => {
                     controller.enqueue({
                         rows: [{ name: 'John', email: 'john@example.com' }],
                         progress: 50,
-                        bytesProcessed: 1024
+                        bytesProcessed: 1024,
+                        metrics: {}
                     });
                     controller.close();
                 }
@@ -383,7 +384,7 @@ describe('MappingModule', () => {
                 duplicatedHeaders: []
             });
 
-            const resultStream = await mappingModule.handleStream(mockStream, layout);
+            const resultStream = await mappingModule.handleStream(mockStream, layout, 1);
             const reader = resultStream.getReader();
 
             try {
@@ -411,7 +412,8 @@ describe('MappingModule', () => {
                     controller.enqueue({
                         rows: [{ name: 'John', email: 'john@example.com' }],
                         progress: 50,
-                        bytesProcessed: 1024
+                        bytesProcessed: 1024,
+                        metrics: {}
                     });
                     controller.close();
                 }
@@ -426,7 +428,7 @@ describe('MappingModule', () => {
                 duplicatedHeaders: []
             });
 
-            const result = mappingModule.handleStream(mockStream, layout);
+            const result = mappingModule.handleStream(mockStream, layout, 1);
 
             expect(result).toBeDefined();
             expect(mockLogger.updateStatus).toHaveBeenCalledWith({
@@ -452,7 +454,8 @@ describe('MappingModule', () => {
                     controller.enqueue({
                         rows: [{ name: 'John', email: 'john@example.com' }],
                         progress: 50,
-                        bytesProcessed: 1024
+                        bytesProcessed: 1024,
+                        metrics: {}
                     });
                     controller.close();
                 }
@@ -467,7 +470,7 @@ describe('MappingModule', () => {
                 duplicatedHeaders: []
             });
 
-            const resultStream = await customModule.handleStream(mockStream, layout);
+            const resultStream = await customModule.handleStream(mockStream, layout, 1);
             const reader = resultStream.getReader();
 
             try {
@@ -498,7 +501,8 @@ describe('MappingModule', () => {
                     controller.enqueue({
                         rows: [{ name: 'John', email: 'john@example.com' }],
                         progress: 50,
-                        bytesProcessed: 1024
+                        bytesProcessed: 1024,
+                        metrics: {}
                     });
                     controller.close();
                 }
@@ -513,7 +517,7 @@ describe('MappingModule', () => {
                 duplicatedHeaders: []
             });
 
-            const resultStream = await customModule.handleStream(mockStream, layout);
+            const resultStream = await customModule.handleStream(mockStream, layout, 1);
             const reader = resultStream.getReader();
 
             try {
@@ -541,7 +545,8 @@ describe('MappingModule', () => {
                             { name: 'Jane', email: 'jane@example.com' }
                         ],
                         progress: 5,
-                        bytesProcessed: 1024
+                        bytesProcessed: 1024,
+                        metrics: {}
                     });
                     controller.close();
                 }
@@ -556,7 +561,7 @@ describe('MappingModule', () => {
                 duplicatedHeaders: []
             });
 
-            const resultStream = await mappingModule.handleStream(mockStream, layout);
+            const resultStream = await mappingModule.handleStream(mockStream, layout, 2);
             const reader = resultStream.getReader();
 
             try {
@@ -590,7 +595,7 @@ describe('MappingModule', () => {
                 duplicatedHeaders: []
             });
 
-            const result = mappingModule.handleStream(mockStream, layout);
+            const result = mappingModule.handleStream(mockStream, layout, 0);
             
             expect(result).toBeDefined();
         });
@@ -612,7 +617,7 @@ describe('MappingModule', () => {
                 duplicatedHeaders: []
             });
 
-            const result = mappingModule.handleStream(mockStream, layout, null, 'custom-step', 5);
+            const result = mappingModule.handleStream(mockStream, layout, 0, undefined, 'custom-step', 5);
             
             expect(mockLogger.updateStatus).toHaveBeenCalledWith({
                 order: 5,
@@ -640,7 +645,7 @@ describe('MappingModule', () => {
                 duplicatedHeaders: []
             });
 
-            const result = mappingModule.handleStream(mockStream, layout);
+            const result = mappingModule.handleStream(mockStream, layout, 0);
             
             expect(result).toBeDefined();
         });
@@ -753,7 +758,8 @@ describe('MappingModule', () => {
                     streamController.enqueue({
                         rows: [{ name: 'John' }],
                         progress: 50,
-                        bytesProcessed: 1024
+                        bytesProcessed: 1024,
+                        metrics: {}
                     });
                 }
             });
@@ -767,7 +773,7 @@ describe('MappingModule', () => {
                 duplicatedHeaders: []
             });
 
-            const result = mappingModule.handleStream(mockStream, layout, controller.signal);
+            const result = mappingModule.handleStream(mockStream, layout, 0, controller.signal);
             expect(result).toBeDefined();
         });
 
@@ -792,7 +798,8 @@ describe('MappingModule', () => {
                             { name: 'Jane', email: 'jane@example.com' }
                         ],
                         progress: 50,
-                        bytesProcessed: 1024
+                        bytesProcessed: 1024,
+                        metrics: {}
                     });
                     streamController.close();
                 }
@@ -810,7 +817,7 @@ describe('MappingModule', () => {
             // Abort before processing
             controller.abort();
 
-            const result = customModule.handleStream(mockStream, layout, controller.signal);
+            const result = customModule.handleStream(mockStream, layout, 2, controller.signal);
             expect(result).toBeDefined();
         });
 

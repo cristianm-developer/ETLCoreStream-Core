@@ -1,7 +1,6 @@
 
 export type OrchestatorStateType =
     | 'initializing'
-    | 'idle'
     | 'waiting-layout'
     | 'waiting-file'
     | 'importing'
@@ -9,11 +8,10 @@ export type OrchestatorStateType =
     | 'handling-local-step'
     | 'persisting'
     | 'handle-global-steps'
+    | 'initializing-user-view'
+    | 'waiting-final-processing'
     | 'waiting-user'
-    | 'waiting-user-with-errors'
     | 'editing-row'
-    | 'handle-local-steps-on-edit'
-    | 'handle-global-steps-on-edit'
+    | 'removing-row'
     | 'exporting'
-    | 'cleaning'
-    | 'unexpected-error';
+    | 'error';

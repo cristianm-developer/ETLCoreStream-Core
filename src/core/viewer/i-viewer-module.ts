@@ -36,4 +36,5 @@ export interface IViewerModule {
     getRowsWithPagination: (persistenceModule: IPersistenceModule, metrics: FileMetrics, filter?: RowFilter, pageNumber?: number, signal?: AbortSignal) => Promise<PaginatedRows>;
     editRow: (persistenceModule: IPersistenceModule, payload: EditRowPayload, signal?: AbortSignal) => Promise<void>;
     removeRow: (persistenceModule: IPersistenceModule, rowId: number, signal?: AbortSignal) => Promise<void>;
+    getTotalPages: (totalRows: number) => number;
 }

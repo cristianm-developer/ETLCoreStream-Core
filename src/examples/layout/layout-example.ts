@@ -11,7 +11,7 @@ import {
   regex, 
   maxLength, 
   minLength 
-} from '@/examples/steps/local/validators/local-validators';
+} from 'examples/steps/local/validators/local-validators';
 
 import {
   trim,
@@ -19,11 +19,11 @@ import {
   extractDigits,
   boolResult,
   clear
-} from '@/examples/steps/local/transforms/local-transforms';
+} from 'examples/steps/local/transforms/local-transforms';
 
 // Import global validators and transforms
-import { AsyncValidateDataExample } from '@/examples/steps/global/validators/global-validators';
-import { AsyncTransformDataExample } from '@/examples/steps/global/transforms/global-transforms';
+import { AsyncValidateDataExample } from 'examples/steps/global/validators/global-validators';
+import { AsyncTransformDataExample } from 'examples/steps/global/transforms/global-transforms';
 
 // Import exports examples
 import {
@@ -33,7 +33,7 @@ import {
   ExportGroupedByCountry,
   ExportForCSV,
   ExportWithValidation,
-} from '@/examples/exports/exports-example';
+} from 'examples/exports/exports-example';
 
 /**
  * Example layout demonstrating a contact ETL pipeline

@@ -82,12 +82,12 @@ describe('LocalStepsEngineModule', () => {
         };
 
         vi.mocked(LoggerModule).mockImplementation(() => mockLogger);
-        stepsEngineModule = new LocalStepsEngineModule({}, mockLogger);
+        stepsEngineModule = new LocalStepsEngineModule(mockLogger, {});
     });
 
     describe('Constructor', () => {
         it('should initialize with default options', () => {
-            const module = new LocalStepsEngineModule({}, mockLogger);
+            const module = new LocalStepsEngineModule(mockLogger, {});
             expect(mockLogger.log).toHaveBeenCalled();
         });
 
@@ -96,7 +96,7 @@ describe('LocalStepsEngineModule', () => {
                 maxErrorCount: 10,
                 validationCodeDictionary: { 'CUSTOM_CODE': 'Custom error' }
             };
-            const module = new LocalStepsEngineModule(customOptions, mockLogger);
+            const module = new LocalStepsEngineModule(mockLogger, customOptions);
             expect(mockLogger).toBeDefined();
         });
 
@@ -104,7 +104,7 @@ describe('LocalStepsEngineModule', () => {
             const customOptions = {
                 maxErrorCount: 5
             };
-            new LocalStepsEngineModule(customOptions, mockLogger);
+            new LocalStepsEngineModule(mockLogger, customOptions);
             expect(mockLogger).toBeDefined();
         });
     });
@@ -118,13 +118,15 @@ describe('LocalStepsEngineModule', () => {
                     controller.enqueue({
                         rows: [createMockRowObject()],
                         progress: 50,
-                        bytesProcessed: 1024
+                        bytesProcessed: 1024,
+                        totalRowsCount: 1,
+                        metrics: {}
                     });
                     controller.close();
                 }
             });
 
-            const resultStream = await stepsEngineModule.handleStream(mockStream, layout);
+            const resultStream = await stepsEngineModule.handleStream(mockStream, layout, 1);
             const reader = resultStream.getReader();
             let capturedChunk: any = null;
 
@@ -150,7 +152,7 @@ describe('LocalStepsEngineModule', () => {
                 }
             });
 
-            await stepsEngineModule.handleStream(mockStream, layout, undefined, 'test-step', 3);
+            await stepsEngineModule.handleStream(mockStream, layout, 0, undefined, 'test-step', 3);
 
             expect(mockLogger.updateStatus).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -170,7 +172,7 @@ describe('LocalStepsEngineModule', () => {
                 }
             });
 
-            await stepsEngineModule.handleStream(mockStream, layout);
+            await stepsEngineModule.handleStream(mockStream, layout, 0);
 
             expect(mockLogger.updateStatus).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -191,13 +193,15 @@ describe('LocalStepsEngineModule', () => {
                     controller.enqueue({
                         rows: [errorRow],
                         progress: 50,
-                        bytesProcessed: 1024
+                        bytesProcessed: 1024,
+                        totalRowsCount: 1,
+                        metrics: {}
                     });
                     controller.close();
                 }
             });
 
-            const resultStream = await stepsEngineModule.handleStream(mockStream, layout);
+            const resultStream = await stepsEngineModule.handleStream(mockStream, layout, 1);
             const reader = resultStream.getReader();
 
             try {
@@ -215,7 +219,7 @@ describe('LocalStepsEngineModule', () => {
 
         it('should throw error when max error count is reached', async () => {
             const layout = createMockLayout();
-            const customModule = new LocalStepsEngineModule({ maxErrorCount: 1 }, mockLogger);
+            const customModule = new LocalStepsEngineModule(mockLogger, { maxErrorCount: 1 });
 
             const failingValidator = createMockValidator({
                 fn: vi.fn((value, row) => ({
@@ -241,13 +245,15 @@ describe('LocalStepsEngineModule', () => {
                             createMockRowObject({ __rowId: 2 })
                         ],
                         progress: 50,
-                        bytesProcessed: 1024
+                        bytesProcessed: 1024,
+                        totalRowsCount: 2,
+                        metrics: {}
                     });
                     controller.close();
                 }
             });
 
-            const resultStream = await customModule.handleStream(mockStream, layout);
+            const resultStream = await customModule.handleStream(mockStream, layout, 2);
             const reader = resultStream.getReader();
 
             try {
@@ -269,18 +275,22 @@ describe('LocalStepsEngineModule', () => {
                     controller.enqueue({
                         rows: [createMockRowObject()],
                         progress: 25,
-                        bytesProcessed: 512
+                        bytesProcessed: 512,
+                        totalRowsCount: 2,
+                        metrics: {}
                     });
                     controller.enqueue({
                         rows: [createMockRowObject({ __rowId: 2 })],
                         progress: 50,
-                        bytesProcessed: 1024
+                        bytesProcessed: 1024,
+                        totalRowsCount: 2,
+                        metrics: {}
                     });
                     controller.close();
                 }
             });
 
-            const resultStream = await stepsEngineModule.handleStream(mockStream, layout);
+            const resultStream = await stepsEngineModule.handleStream(mockStream, layout, 2);
             const reader = resultStream.getReader();
 
             try {
@@ -304,7 +314,7 @@ describe('LocalStepsEngineModule', () => {
                 }
             });
 
-            await stepsEngineModule.handleStream(mockStream, layout);
+            await stepsEngineModule.handleStream(mockStream, layout, 0);
 
             expect(mockLogger.updateStatus).toHaveBeenCalled();
         });
@@ -723,13 +733,15 @@ describe('LocalStepsEngineModule', () => {
                             createMockRowObject({ __rowId: 2 })
                         ],
                         progress: 50,
-                        bytesProcessed: 1024
+                        bytesProcessed: 1024,
+                        totalRowsCount: 2,
+                        metrics: {}
                     });
                     controller.close();
                 }
             });
 
-            const resultStream = await stepsEngineModule.handleStream(mockStream, layout);
+            const resultStream = await stepsEngineModule.handleStream(mockStream, layout, 2);
             const reader = resultStream.getReader();
 
             try {

@@ -41,11 +41,11 @@ describe("ImportFilePapaparseModule", () => {
         const csvContent = "name,email\nCristian,test@me.com";
         const file = new File([csvContent], "test.csv", { type: "text/csv" });
 
-        const result = importer.readFileStream(file);
+        const [stream, totalRowsEstimated] = importer.readFileStream(file);
 
-        expect(result).toBeDefined();
-        expect(result).toHaveProperty("stream");
-        expect(result).toHaveProperty("controls");
+        expect(stream).toBeDefined();
+        expect(stream).toBeInstanceOf(ReadableStream);
+        expect(totalRowsEstimated).toBeDefined();
     })
 
     it('should fail on empty file', () => {

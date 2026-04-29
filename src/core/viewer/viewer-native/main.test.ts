@@ -69,7 +69,7 @@ describe('ViewerModule', () => {
             updateRow: vi.fn(),
             deleteRow: vi.fn(),
             deleteErrors: vi.fn(),
-            updateMetricsSaved: vi.fn()
+            updateMetrics: vi.fn()
         };
 
         vi.mocked(LoggerModule).mockImplementation(() => mockLogger);
@@ -98,6 +98,38 @@ describe('ViewerModule', () => {
                 'constructor',
                 'viewer-native'
             );
+        });
+    });
+
+    describe('getTotalPages', () => {
+        it('should calculate correct number of pages', () => {
+            const totalPages = viewerModule.getTotalPages(100);
+            expect(totalPages).toBe(4);
+        });
+
+        it('should handle exact page boundaries', () => {
+            const totalPages = viewerModule.getTotalPages(75);
+            expect(totalPages).toBe(3);
+        });
+
+        it('should return 1 for partial first page', () => {
+            const totalPages = viewerModule.getTotalPages(10);
+            expect(totalPages).toBe(1);
+        });
+
+        it('should return 1 for single page size', () => {
+            const totalPages = viewerModule.getTotalPages(25);
+            expect(totalPages).toBe(1);
+        });
+
+        it('should handle zero rows', () => {
+            const totalPages = viewerModule.getTotalPages(0);
+            expect(totalPages).toBe(0);
+        });
+
+        it('should handle large datasets', () => {
+            const totalPages = viewerModule.getTotalPages(10000);
+            expect(totalPages).toBe(400);
         });
     });
 
@@ -483,7 +515,7 @@ describe('ViewerModule', () => {
 
             await viewerModule.removeRow(mockPersistenceModule, 1);
 
-            expect(mockPersistenceModule.updateMetricsSaved).toHaveBeenCalled();
+            expect(mockPersistenceModule.updateMetrics).toHaveBeenCalled();
         });
 
         it('should log row removal', async () => {

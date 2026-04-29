@@ -18,7 +18,8 @@ export interface OrchestatorContext {
     currentRowsFilter: RowFilter | null;
     currentRows: RowObject[] | null;
     currentErrors: ValidationError[] | null;
-    pageNumber: number;    
+    currentPage: number;    
+    totalPages: number;
     totalEstimatedRows: number | null;
     processingRows: boolean;
 }

@@ -11,5 +11,5 @@
       "@schemes/*": ["./src/shared/schemes/*"]
     }    
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "examples"]
 }

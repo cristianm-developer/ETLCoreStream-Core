@@ -17,6 +17,8 @@ export interface IOrchestatorModule {
     getCurrentState(): OrchestatorStateType;
     getCurrentContext(): OrchestatorContext;
 
+    getProgress$(): Observable<{label: string, value: number|null}[]>
+
     getStateObservable(): Observable<OrchestatorStateType>;
     getContextObservable(): Observable<OrchestatorContext>;
     getMetricsObservable(): Observable<OrchestatorContext['metrics']>;
