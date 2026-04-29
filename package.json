@@ -1,0 +1,39 @@
+{
+  "name": "ETL CoreStream",
+  "version": "1.0.0",
+  "description": "ETL Core Services",
+  "license": "ISC",
+  "author": "Cristian Marin",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "test": "vitest",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@preact/signals-core": "^1.14.1",
+    "@xstate/graph": "^3.0.4",
+    "papaparse": "^5.5.3",
+    "rxjs": "^7.8.2",
+    "streamsaver": "^2.0.6",
+    "vite": "^8.0.8",
+    "xstate": "^5.30.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/papaparse": "^5.5.2",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.8",
+    "vitest": "^4.1.4"
+  }
+}
