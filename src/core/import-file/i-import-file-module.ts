@@ -27,6 +27,6 @@ export interface StreamResult {
 }
 
 export interface IImportFileModule {
-    readFileStream: (file: File, assignEstimatedRows: (rows: number) => void, signal?: AbortSignal) => ReadableStream | StreamResult;
+    readFileStream: (file: File, signal?: AbortSignal) => [ReadableStream, Signal<number|null>];
     getProgress(): Signal<number|null>;
 }

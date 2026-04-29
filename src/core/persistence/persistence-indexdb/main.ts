@@ -4,6 +4,7 @@ import { ErrorFilter, RowFilter } from "@/shared/schemes/persistent-filter";
 import { RowObject } from "@/shared/schemes/row-object";
 import { ValidationError } from "@/shared/schemes/local-step-validators";
 import { FileMetrics } from "@/shared/schemes/file-metrics";
+import { Signal } from "@preact/signals-core";
 
 
 
@@ -15,6 +16,8 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
     private db: IDBDatabase | null = null;
     private maxStorageBytes: number = 50 * 1024 * 1024;
 
+    private progress = new Signal<number|null>(null);
+
     constructor(logger: LoggerModule, options: PersistenceModuleOptions) {
         this.logger = logger;
         this.options = { ...DEFAULT_PERSISTENCE_MODULE_OPTIONS, ...options };
@@ -23,6 +26,8 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
         this.getRowsStream = this.getRowsStream.bind(this);
         this.getErrorsStream = this.getErrorsStream.bind(this);
     }
+    
+    getProgress = () => this.progress;
 
 
     private initDb: () => Promise<IDBDatabase> = async () => {
@@ -354,12 +359,12 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
     }
 
 
-    saveStream = async (stream: ReadableStream<{ rawRows: RowObject[], errorDicc: Record<number, ValidationError>, metrics?: any }>, signal?: AbortSignal) => {
+    saveStream = async (stream: ReadableStream<{ rawRows: RowObject[], errorDicc: Record<number, ValidationError> }>, totalRowEstimated: number | null, onFirstChunkReady?: () => void, signal?: AbortSignal) => {
         await this.initDb();
 
-        const currentMetrics: FileMetrics = (await this.getMetrics()) ?? { id: '1', fileName: '1', fileSize: 0, totalRows: 0, totalErrorRows: 0, createdAt: 0, namefile: '' };
+        let totalRowsProcessed = 0;
+        let firstChunkReady = false;
 
-        let metricExist = false;
         const writable = new WritableStream({
             write: async (chunk, controller) => {
                 signal?.throwIfAborted();
@@ -386,28 +391,28 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
                     ]);
                     this.logger.log(`Processed ${rows.length} rows successfully`, 'debug', 'saveStream', this.id);
 
-                    if (metrics) {
-                        metricExist = true;
 
-                        currentMetrics.totalRows = metrics.totalRows;
-                        currentMetrics.totalErrorRows = metrics.totalErrorRows;
-                        currentMetrics.namefile = metrics.fileName;
-                        currentMetrics.fileSize = metrics.fileSize;
-                        currentMetrics.createdAt = metrics.createdAt;
-
-                        await this.updateMetrics(currentMetrics);
-                    } 
+                    totalRowsProcessed += rows.length;
+                    if (totalRowEstimated !== null) {
+                        this.progress.value = Math.round((totalRowsProcessed / totalRowEstimated) * 100);
+                    } else {
+                        this.progress.value = null;
+                    }
 
                 } catch (error) {
                     this.logger.log(`Error saving stream chunk: ${error instanceof Error ? error.message : String(error)}`, 'error', 'saveStream', this.id);
                     throw error;
+                } finally 
+                {
+                    if(!firstChunkReady && onFirstChunkReady){
+                        onFirstChunkReady();
+                        firstChunkReady = true;
+                    }
                 }
+            
             },
             close: async () => {
                 this.logger.log('Writable stream closed', 'debug', 'saveStream', this.id);
-                if(!metricExist){
-                    await this.updateMetricsSaved();
-                }
             },
             abort: (reason) => {
                 this.logger.log(`Writable stream aborted: ${reason}`, 'warn', 'saveStream', this.id);
@@ -514,19 +519,8 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
         ])
     }
 
-    saveMetrics: (metrics: FileMetrics) => Promise<void> = async (metrics: FileMetrics) => {
-        await this.executeTransaction('readwrite', [
-            {
-                storeName: this.options.storeNames.metrics,
-                fn: (store) => {
-                    store.put(metrics);
-                }
-            }
-        ]);
-        this.logger.log(`Metrics saved for file ${metrics.fileName}`, 'debug', 'saveMetrics', this.id);
-    }
 
-    updateMetricsSaved: () => Promise<void> = async () => {
+    updateMetrics: () => Promise<void> = async () => {
         
         const metrics = await this.getMetrics();
         await this.executeTransaction('readonly', [
@@ -554,18 +548,6 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
                 }
             }
         ]);
-    }
-
-    updateMetrics: (metrics: FileMetrics) => Promise<void> = async (metrics: FileMetrics) => {
-        await this.executeTransaction('readwrite', [
-            {
-                storeName: this.options.storeNames.metrics,
-                fn: (store) => {
-                    store.put(metrics);
-                }
-            }
-        ]);
-        this.logger.log(`Metrics updated for file ${metrics.fileName}`, 'debug', 'updateMetrics', this.id);
     }
 
     getMetrics: () => Promise<FileMetrics | undefined> = async () => {

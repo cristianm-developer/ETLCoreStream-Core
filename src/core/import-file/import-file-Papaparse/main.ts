@@ -18,6 +18,8 @@ export class ImportFilePapaparseModule implements IImportFileModule {
 
     private progress = new Signal<number|null>(null);
 
+    private totalRowsEstimated = new Signal<number|null>(null);
+
     constructor(logger: LoggerModule, config: ImportFileModuleOptions = {}){
         this.logger = logger;
         this.config = { ...DEFAULT_IMPORT_FILE_MODULE_OPTIONS, ...config };
@@ -27,21 +29,24 @@ export class ImportFilePapaparseModule implements IImportFileModule {
     getProgress = () => this.progress;
     
 
-    readFileStream = (file: File, assignEstimatedRows: (rows: number) => void, signal?: AbortSignal) => {
+    readFileStream = (file: File, signal?: AbortSignal): [ReadableStream, Signal<number|null>] => {
         let validationResult = validateFile(file, this.config);
         if(validationResult?.isValid){
-            return this.createDataStream(file, assignEstimatedRows, signal);
+            const stream = this.createDataStream(file, signal);
+            return [stream, this.totalRowsEstimated];
         } else {
             this.logger.log('Validation failed: ' + validationResult?.message || 'File validation failed', 'error', 'readFileStream', this.id);
             throw new Error('Validation failed: ' + validationResult?.message || 'File validation failed');
         }
     }
 
-    createDataStream(file: File, assignEstimatedRows: (rows: number) => void, signal?: AbortSignal) {
+    createDataStream(file: File, signal?: AbortSignal) {
 
         this.logger.log('Creating data stream', 'debug', 'createDataStream', this.id);
 
-        let totalRowsEstimated = 0;
+        this.totalRowsEstimated.value = 0;
+        
+        let totalRowsProcessed = 0;
 
         let parserInstance:any = null;
         const fileSize = file.size;        
@@ -68,11 +73,11 @@ export class ImportFilePapaparseModule implements IImportFileModule {
                         this.logger.log(`Chunk read: ${results.data.length} rows`, 'debug', 'createDataStream', this.id);
                         this.logger.updateStatus({ order: 1, progress: Math.round(progress * 100) / 100, status: 'running', step: 'createDataStream' });
 
-                        if(totalRowsEstimated === 0 && results.data.length){
-                            const chunkSize = results.meta.cursor;
-                            const aproxRowSize = chunkSize / results.data.length;
-                            totalRowsEstimated = Math.floor(fileSize / aproxRowSize);
-                            assignEstimatedRows(totalRowsEstimated);
+                        totalRowsProcessed += results.data.length;
+
+                        if(results.data.length){                            
+                            const aproxRowSize = bytesRead / totalRowsProcessed ;
+                            this.totalRowsEstimated.value = Math.floor(fileSize / aproxRowSize);
                         }
 
                         this.progress.value = progress;
@@ -96,6 +101,7 @@ export class ImportFilePapaparseModule implements IImportFileModule {
                         this.logger.log('File read complete', 'debug', 'createDataStream', this.id);
                         this.logger.updateStatus({ order: 1, progress: 100, status: 'completed', step: 'createDataStream' });
                         controller.close();
+                        this.totalRowsEstimated.value = totalRowsProcessed;
                         this.progress.value = null;
                     },
                     error: (err) => {
@@ -114,22 +120,9 @@ export class ImportFilePapaparseModule implements IImportFileModule {
             cancel: () => parserInstance?.abort(),
         })
 
-        handleAbortSignal(signal, 'createDataStream', this.id);
+        signal?.throwIfAborted();
 
-        return {
-            stream,
-            controls: {
-                pause: () => {
-                    handleAbortSignal(signal, 'createDataStream', this.id);
-                    parserInstance?.pause();
-                },
-                resume: () => {
-                    handleAbortSignal(signal, 'createDataStream', this.id);
-                    parserInstance?.resume();
-                },
-                abort: () => parserInstance?.abort(),
-            }
-        }
+        return stream;
 
     }
 

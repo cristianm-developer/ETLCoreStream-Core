@@ -9,4 +9,7 @@ export type OrchestatorEvent =
     | { type: 'EDIT_ROW'; rowEdition: {rowId: number, key: string, value: string} }
     | { type: 'REMOVE_ROW'; rowId: number }
     | { type: 'EXPORT'; id: string, target: 'Stream'| 'File' }
-    | { type: 'RESET' };
+    | { type: 'RESET' }
+    | { type: 'FIRST_CHUNK_RAW_READY' }
+    | { type: 'FIRST_CHUNK_PROCESSED_READY' }
+    | { type: 'PROCESSING_READY' };

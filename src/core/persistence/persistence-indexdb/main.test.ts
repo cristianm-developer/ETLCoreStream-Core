@@ -815,7 +815,7 @@ describe('PersistenceIndexDbModule', () => {
     describe('updateMetricsSaved', () => {
         it('should be callable without throwing in constructor', () => {
             expect(() => {
-                persistenceModule.updateMetricsSaved();
+                persistenceModule.updateMetrics();
             }).not.toThrow();
         });
     });

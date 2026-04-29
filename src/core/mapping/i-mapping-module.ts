@@ -22,7 +22,6 @@ export interface IMappingModule {
     handleStream: (
         stream: ReadableStream,
         layout: LayoutBase,
-        assignProgress: (progress: {label: string, value: number|null}) => void,
         totalRowEstimated: number,
         signal?: AbortSignal,
         step?: string,

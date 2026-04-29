@@ -8,9 +8,8 @@ export interface OrchestatorContext {
     layout: any | null;
     progress: {label: string, value: number|null}[];
     unexpectedError: string | null;
-    metrics: {
+    metrics?: {
         totalRows: number;
-        processedRows: number;
         errorCount: number;
     };
     editingRow: {rowId: number, key: string, value: string} | null;
@@ -21,4 +20,5 @@ export interface OrchestatorContext {
     currentErrors: ValidationError[] | null;
     pageNumber: number;    
     totalEstimatedRows: number | null;
+    processingRows: boolean;
 }

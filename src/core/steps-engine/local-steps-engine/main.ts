@@ -7,6 +7,7 @@ import { LocalStepTransform } from "@/shared/schemes/local-step-transforms";
 import { error } from "node:console";
 import { LocalStepValidator, ValidationError } from "@/shared/schemes/local-step-validators";
 import { ILocalStepsEngineModule, LocalStepsEngineModuleOptions, DEFAULT_STEPS_ENGINE_OPTIONS } from "../i-local-steps-engine-module";
+import { Signal } from "@preact/signals-core";
 
 
 export type { LocalStepsEngineModuleOptions as StepsEngineModuleOptions };
@@ -18,18 +19,24 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
     private options: LocalStepsEngineModuleOptions;
     private logger: LoggerModule;
 
+    private progress = new Signal<number|null>(null);
+
     constructor( logger: LoggerModule, options: LocalStepsEngineModuleOptions) {
         this.options = { ...DEFAULT_STEPS_ENGINE_OPTIONS, ...options };
         this.logger = logger;
         this.logger.log('LocalStepsEngineModule initialized', 'debug', 'constructor', this.id);
     }
 
-    handleStream = async (stream: ReadableStream, layout: LayoutBase, signal?: AbortSignal, step: string = 'steps-engine', order: number = 2) => {
+    getProgress = () => this.progress;
+
+    handleStream = async (stream: ReadableStream, layout: LayoutBase, totalRowEstimated: number, signal?: AbortSignal, step: string = 'steps-engine', order: number = 2) => {
         this.logger.log('Handling stream', 'debug', step, this.id);
         this.logger.updateStatus({ order, progress: 0, status: 'running', step });
 
         let errorCount = {count : 0};
         let errorDicc: Record<string, ValidationError> = {};
+
+        let totalRowsProcessed = 0;
 
         let transformer = new TransformStream({
             transform: async (chunk, controller) => {
@@ -40,9 +47,13 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
                     this.handleAbortSignal(signal);
     
                     for (let i = 0; i < rowCount; i++) {
+
+                        totalRowsProcessed++;
     
                         const row = rows[i] as RowObject;
                         const steps = layout.localSteps;
+
+                        this.progress.value = Math.round((totalRowsProcessed / totalRowEstimated) * 100);
     
                         if(row.__sError){
                             this.logger.log(`Row ${row.__rowId} is error, skipping`, 'debug', 'handleStream', this.id);
@@ -78,6 +89,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
                     status: 'completed',
                     step: 'steps-engine'
                 });
+                this.progress.value = null;
             }
         })
 

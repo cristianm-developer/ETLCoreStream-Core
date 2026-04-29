@@ -28,7 +28,7 @@ export class MappingModule implements IMappingModule {
 
     getProgress = () => this.progress;
 
-    handleStream = async (stream: ReadableStream, layout: LayoutBase, assignProgress: (progress: {label: string, value: number|null}) => void, totalRowEstimated: number, signal?: AbortSignal, step: string = 'mapping', order: number = 2) => {
+    handleStream = async (stream: ReadableStream, layout: LayoutBase, totalRowEstimated: number, signal?: AbortSignal, step: string = 'mapping', order: number = 2) => {
         this.logger.log('Handling stream', 'debug', step, this.id);
         this.logger.updateStatus({ order, progress: 0, status: 'running', step });
 
@@ -39,7 +39,6 @@ export class MappingModule implements IMappingModule {
 
         let totalRowsCount = 0;
         
-
         const transformer = new TransformStream({
             transform: async (chunk, controller) => {
 
@@ -64,7 +63,6 @@ export class MappingModule implements IMappingModule {
                         totalRowsCount++;
 
                         this.progress.value = Math.round((totalRowsCount / totalRowEstimated) * 100);
-                        assignProgress({label: 'Mapping', value: this.progress.value});
 
                         for (let j = 0; j < mapLen; j++){
                             const [internalKey, externalKey] = columnMapEntries[j];

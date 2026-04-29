@@ -126,7 +126,7 @@ export class ViewerModule implements IViewerModule {
             await persistenceModule.deleteRow(rowId);
             await persistenceModule.deleteErrors([rowId]);
 
-            await persistenceModule.updateMetricsSaved();
+            await persistenceModule.updateMetrics();
 
             this.logger.log(`Row ${rowId} removed from persistence`, 'debug', 'removeRow', this.id);
 

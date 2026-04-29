@@ -2,6 +2,7 @@ import { LayoutBase } from "@/shared/schemes/layout-base";
 import { RowObject } from "@/shared/schemes/row-object";
 import { ValidationError } from "@/shared/schemes/local-step-validators";
 import { LayoutLocalStep } from "@/shared/schemes/layout-local-step";
+import { Signal } from "@preact/signals-core";
 
 export type LocalStepsEngineModuleOptions = {
     maxErrorCount?: number;
@@ -20,41 +21,15 @@ export type LocalStepResult = {
 };
 
 export interface ILocalStepsEngineModule {
+    getProgress: () => Signal<number|null>;
+
     handleStream: (
         stream: ReadableStream,
         layout: LayoutBase,
+        totalRowEstimated: number,
         signal?: AbortSignal,
         step?: string,
         order?: number
     ) => Promise<ReadableStream>;
-    
-    handleStep: (
-        step: any,
-        row: RowObject,
-        errorCount: {count: number},
-        signal?: AbortSignal,
-        errorDicc?: Record<string, ValidationError>
-    ) => void;
-    
-    executeValidators: (config: {
-        step: any;
-        row: RowObject;
-        signal?: AbortSignal;
-        errorDicc: Record<string, ValidationError>;
-        errorCount: {count: number};
-    }) => void;
-    
-    executeTransforms: (config: {
-        step: any;
-        row: RowObject;
-        signal?: AbortSignal;
-    }) => void;
-    
-    handleAbortSignal: (signal?: AbortSignal) => void;
-
-    executeSingleRow: (
-        row: RowObject,
-        layout: LayoutBase,
-        signal?: AbortSignal
-    ) => Promise<LocalStepResult>;
+   
 }

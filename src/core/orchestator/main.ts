@@ -1,26 +1,20 @@
 import { LayoutBase } from "@/shared/schemes/layout-base";
 import { ILoggerModule } from "../logger/i-logger-module";
 import { ProviderModule } from "../provider/main";
-import { IOrchestatorModule } from "./i-orchestator-module";
 import { OrchestatorContext } from "./schemes/orchestator-context";
 import { BehaviorSubject, Observable } from "rxjs";
 import { OrchestatorStateType } from "./schemes/orchestator-states";
 import { Log } from "@/shared/schemes/log";
-import { ActorRefFrom, assign, createActor, createMachine, fromPromise, setup, Subscription } from "xstate";
+import { ActorRefFrom, assign, createActor, createMachine, emit, fromPromise, setup, Subscription } from "xstate";
 import { Signal, signal } from "@preact/signals-core";
 import { OrchestatorEvent } from "./schemes/orchestator-event";
 import { RowObject } from "@/shared/schemes/row-object";
-import { ValidationError } from "@/shared/schemes/local-step-validators";
 
 
 const DEFAULT_CONTEXT: OrchestatorContext = {
     file: null,
     layout: null,
-    metrics: {
-        totalRows: 0,
-        processedRows: 0,
-        errorCount: 0,
-    },
+    metrics: undefined,
     progress: [],
     activeStream: null,
     unexpectedError: null,
@@ -32,6 +26,7 @@ const DEFAULT_CONTEXT: OrchestatorContext = {
     currentErrors: null,
     pageNumber: 1,
     totalEstimatedRows: 0,
+    processingRows: false,
 }
 
 export class OrchestatorModule {
@@ -106,12 +101,12 @@ export class OrchestatorModule {
                     events: OrchestatorEvent,
                     children: {
                         "import-file": { output: ReadableStream<any> };
-                        "mapping": { output: {metrics: {totalRows: number, processedRows: number, errorCount: number}} };
-                        "handling-local-step": { output: {metrics: {totalRows: number, processedRows: number, errorCount: number}} };
-                        "persisting": { output: {metrics: {totalRows: number, processedRows: number, errorCount: number}} };
-                        "handle-global-steps": { output: {metrics: {totalRows: number, processedRows: number, errorCount: number}} };
-                        "loading-rows": { output: {metrics: {totalRows: number, processedRows: number, errorCount: number}} };
-                        "editing-data": { output: {metrics: {totalRows: number, processedRows: number, errorCount: number}} };
+                        "mapping": { output: undefined };
+                        "handling-local-step": { output: undefined };
+                        "persisting": { output: undefined };
+                        "handle-global-steps": { output: undefined };
+                        "loading-rows": { output: undefined };
+                        "editing-data": { output: undefined };
                         "local-step-pipe": { output: ReadableStream<any> };
                         "global-step-pipe": { output: ReadableStream<any> };
                         "cleaning": { output: undefined };
@@ -156,6 +151,7 @@ export class OrchestatorModule {
                     importing: {
                         entry: () => {
                             this.logger.log('Importing file...', 'info', 'importing', this.id);
+                            assign({ processingRows: true });
                         },
                         invoke: {
                             id: 'import-file',
@@ -163,7 +159,7 @@ export class OrchestatorModule {
                             input: ({ context }) => ({ file: context.file }),
                             onDone: {
                                 target: 'mapping',
-                                actions: assign({ activeStream: ({ event }) => event.output })
+                                actions: assign({ activeStream: ({ event }) => event.output, processingRows: true })
                             },
                             onError: {
                                 target: 'error',
@@ -181,7 +177,6 @@ export class OrchestatorModule {
                             input: ({ context }) => ({ activeStream: context.activeStream, layout: context.layout, totalEstimatedRows: context.totalEstimatedRows }),
                             onDone: {
                                 target: 'persisting',
-                                actions: assign({ metrics: ({ event }) => event.output }),
                             },
                             onError: {
                                 target: 'error',
@@ -199,7 +194,6 @@ export class OrchestatorModule {
                             input: ({ context }) => ({ activeStream: context.activeStream, layout: context.layout, totalEstimatedRows: context.totalEstimatedRows }),
                             onDone: {
                                 target: 'persisting',
-                                actions: assign({ metrics: ({ event }) => event.output }),
                             },
                             onError: {
                                 target: 'error',
@@ -214,17 +208,15 @@ export class OrchestatorModule {
                         invoke: {
                             id: 'persisting',
                             src: 'persisting',
-                            input: ({ context }) => ({ activeStream: context.activeStream }),
-                            onDone: {
-                                target: 'handle-global-steps',
-                                actions: assign({ 
-                                    metrics: ({ event }) => event.output,
-                                    activeStream: () => null,
-                                }),
-                            },
+                            input: ({ context }) => ({ activeStream: context.activeStream, totalEstimatedRows: context.totalEstimatedRows }),
                             onError: {
                                 target: 'error',
                                 actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                            },                            
+                        },
+                        on: {
+                            FIRST_CHUNK_RAW_READY: {
+                                target: 'handle-global-steps',
                             }
                         }
                     },
@@ -235,26 +227,39 @@ export class OrchestatorModule {
                         invoke: {
                             id: 'handle-global-steps',
                             src: 'handlingGlobalStep',
-                            input: ({ context }) => ({ layout: context.layout }),
+                            input: ({ context }) => ({ layout: context.layout, totalEstimatedRows: context.totalEstimatedRows }),
                             onDone: [
                                 {
                                     target: 'initializing-user-view',
-                                    actions: assign({ metrics: ({ event }) => event.output })
                                 }
                             ],
                             onError: {
                                 target: 'error',
                                 actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
                             }
+                        },
+                        on: {
+                            FIRST_CHUNK_PROCESSED_READY: {
+                                target: 'initializing-user-view',
+                            }
                         }
                     },
                     'initializing-user-view': {
                         entry: [
                             () => this.logger.log('Initializing user view...', 'info', 'initializing-user-view', this.id),
-                            assign({ activeStream: () => null }),
                         ],
                         initial: 'loading-rows',
                         states: {
+                            'loading-metrics': {
+                                entry: () => {
+                                    this.logger.log('Loading metrics...', 'info', 'loading-metrics', this.id);
+                                },
+                                invoke: {
+                                    id: 'loading-metrics',
+                                    src: 'loadingMetrics',
+                                    input: ({ context }) => ({ layout: context.layout }),
+                                }
+                            },
                             'loading-rows': {
                                 entry: () => {
                                     this.logger.log('Loading rows...', 'info', 'loading-rows', this.id);
@@ -262,13 +267,9 @@ export class OrchestatorModule {
                                 invoke: {
                                     id: 'loading-rows',
                                     src: 'loadingRows',
-                                    input: ({ context }) => ({ layout: context.layout, metrics: context.metrics }),
+                                    input: ({ context }) => ({ layout: context.layout }),
                                     onDone: {
-                                        target: 'user-view-initialized',
-                                        actions: assign({ 
-                                            currentRows: ({ event }) => event.output.rows,
-                                            currentErrors: ({ event }) => event.output.errors,
-                                        })
+                                        target: 'user-view-initialized',                 
                                     },
                                     onError: {
                                         target: '#ETL-error',
@@ -284,9 +285,30 @@ export class OrchestatorModule {
                             target: 'waiting-user'
                         }
                     },
+                    'waiting-final-proccessing': {
+                        entry: () => {
+                            this.logger.log('Waiting for final proccessing...', 'info', 'waiting-final-proccessing', this.id);
+                        },
+                        always: {
+                            target: 'waiting-user',
+                            guard: ({ context }) => context.processingRows === false,
+                        },
+                        on: {
+                            CHANGE_PAGE: {
+                                target: 'initializing-user-view',
+                                actions: assign({ pageNumber: ({ event }) => event.pageNumber })
+                            },
+                            FINAL_PROCESSING_READY: {
+                                target: 'waiting-user',
+                                actions: assign({ processingRows: false })
+                            }
+                        }
+                        
+                    },
                     'waiting-user': {
                         entry: () => {
                             this.logger.log('Waiting for user interaction...', 'info', 'waiting-user', this.id);
+                            assign({ processingRows: false });
                         },
                         on: {
                             CHANGE_PAGE: {
@@ -358,6 +380,7 @@ export class OrchestatorModule {
                                     input: ({ context }) => ({ activeStream: context.activeStream }),
                                     onDone: {
                                         target: 'global-step-pipe',
+                                        actions: assign({ activeStream: null }),
                                     },
                                     onError: {
                                         target: '#ETL-error',
@@ -389,8 +412,7 @@ export class OrchestatorModule {
                                         editingRow: () => null,
                                         removingRow: () => null,
                                         exporting: () => null,
-                                        activeStream: () => null,
-                                        pageNumber: () => 1,
+                                        activeStream: () => null
                                     }),
                                 ],
                                 type: 'final'
@@ -417,6 +439,7 @@ export class OrchestatorModule {
                                 actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
                             }
                         },
+                        exit: assign({ removingRow: () => null }),
                     },
                     exporting: {
                         entry: () => {
@@ -433,6 +456,7 @@ export class OrchestatorModule {
                                 actions: assign(({ event }) => ({ unexpectedError: event.error.toString() }))
                             }
                         },
+                        exit: assign({ exporting: () => null }),
                     },
                     error: {
                         id: 'ETL-error',
@@ -441,7 +465,7 @@ export class OrchestatorModule {
                         },
                         on: {
                             RESET: {
-                                target: '#ETL-initializing',
+                                target: 'initializing',
                                 actions: assign(DEFAULT_CONTEXT),
                             }
                         }
@@ -450,7 +474,7 @@ export class OrchestatorModule {
                 },
                 on: {
                     'RESET': {
-                        target: '#ETL-initializing',
+                        target: 'initializing',
                         actions: assign(DEFAULT_CONTEXT),
                     }
                 }
@@ -460,43 +484,57 @@ export class OrchestatorModule {
                     importFile: fromPromise(async ({ input, signal }: any) => {
                         const importer = this.provider.modules.importer;
                         const progressSignal = importer.getProgress();
-                        assign({progress: [...this.contextSubject.value.progress, {label: 'Importing file', value: progressSignal}]});
-                        return importer.readFileStream(input.file, (rows) =>  assign({totalEstimatedRows: rows}), signal);
+                        const [stream, totalRowsEstimated] = importer.readFileStream(input.file, signal);
+                        assign({progress: [...this.contextSubject.value.progress, {label: 'Importing file', value: progressSignal}], totalEstimatedRows: totalRowsEstimated});
+                        return stream;
                     }),
                     mapping: fromPromise(async ({ input, signal }: any) => {
                         const mapper = this.provider.modules.mapper;
                         const progressSignal = mapper.getProgress();
                         assign({progress: [...this.contextSubject.value.progress, {label: 'Mapping', value: progressSignal}]});
-                        return mapper.handleStream(input.activeStream, input.layout, (progress) => assign({progress: [...this.contextSubject.value.progress, progress]}), input.totalEstimatedRows, signal);
+                        return mapper.handleStream(input.activeStream, input.layout, input.totalEstimatedRows, signal);
                     }),
                     handlingLocalStep: fromPromise(async ({ input, signal }: any) => {
                         const localStepEngine = this.provider.modules.localStepEngine;
-                        return localStepEngine.handleStream(input.activeStream, input.layout, (progress) => assign({progress: [...this.contextSubject.value.progress, progress]}), input.totalEstimatedRows, signal);
+                        const progressSignal = localStepEngine.getProgress();
+                        assign({progress: [...this.contextSubject.value.progress, {label: 'Local Validations/Transformations', value: progressSignal}]});
+                        return localStepEngine.handleStream(input.activeStream, input.layout, input.totalEstimatedRows, signal);
                     }),
-                    persisting: fromPromise(async ({ input, signal }: any) => {
+                    persisting: fromPromise(async ({ input, emit, signal }: any) => {
                         const persistence = this.provider.modules.persistence;
-                        return persistence.saveStream(input.activeStream, signal);
+                        const progressSignal = persistence.getProgress();
+                        assign({progress: [...this.contextSubject.value.progress, {label: 'Saving data', value: progressSignal}]});
+                        persistence.saveStream(input.activeStream, input.totalEstimatedRows, () => emit({ type: 'FIRST_CHUNK_RAW_READY' }) , signal);
                     }),
-                    handlingGlobalStep: fromPromise(async ({ input, signal }: any) => {
+                    handlingGlobalStep: fromPromise(async ({ input, signal, emit }: any) => {
                         const globalStepEngine = this.provider.modules.globalStepEngine;
                         const persistence = this.provider.modules.persistence;
-
+                                                                                
                         for (const step of input.layout.globalSteps) {
-                            const stream = globalStepEngine.handleStep(step, persistence, signal);
-                            let removedErrors: number[] = [];
-                            const transformedStream = stream.pipeThrough(new TransformStream({
+                            const filter = step.filter.rows;
+                            const streamInput = persistence.getRowsStream(filter);
+                                                        
+                            let removedErrorsAcc: number[] = [];
+                            const streamResult = globalStepEngine.handleStep(streamInput, step, null, signal);                            
+                            const transformedStream = streamResult.pipeThrough(new TransformStream({
                                 transform: async ({ rows, errors, removedErrors }: any, controller) => {
-                                    removedErrors = removedErrors ?? [];
-                                    controller.enqueue({ rawRows: rows, errorDicc: errors, metrics: null });
+                                    removedErrorsAcc.push(...(removedErrors ?? []));
+                                    controller.enqueue({ rawRows: rows, errorDicc: errors });
                                 }
                             }));
 
-                            await persistence.saveStream(transformedStream, signal);
-                            if (removedErrors.length > 0) {
-                                await persistence.deleteErrors(removedErrors);
+                            persistence.saveStream(transformedStream, null, () => emit({ type: 'FIRST_CHUNK_PROCESSED_READY' }), signal);
+                            if (removedErrorsAcc.length > 0) {
+                                persistence.deleteErrors(removedErrorsAcc);
                             }
                         }
-                        await persistence.updateMetricsSaved();
+
+                    }),
+                    loadingMetrics: fromPromise(async ({ input, signal }: any) => {
+                        const persistence = this.provider.modules.persistence;
+                        await persistence.updateMetrics();
+                        const metrics = await persistence.getMetrics();
+                        assign({ metrics: metrics });
                     }),
                     loadingRows: fromPromise(async ({ input, signal }: any) => {
                         const persistence = this.provider.modules.persistence;
@@ -510,44 +548,55 @@ export class OrchestatorModule {
                         const editor = this.provider.modules.viewer;
                         const persistence = this.provider.modules.persistence;
 
+                        assign({ processingRows: true });
                         await editor.editRow(persistence, input.rowEdition, signal);
                     }),
                     localStepPipe: fromPromise(async ({ input, signal }: any) => {
                         const localStepEngine = this.provider.modules.localStepEngine;
                         const persistence = this.provider.modules.persistence;
-
+                        
                         const stream = persistence.getRowsStream({ rowIdIn: [input.rowEdition.rowId] });
-                        const resultStream = await localStepEngine.handleStream(stream, input.layout, signal);
-
+                        const resultStream = await localStepEngine.handleStream(stream, input.layout, 1, signal);
+                        
                         return resultStream;
                     }),
                     globalStepPipe: fromPromise(async ({ input, signal }: any) => {
+
                         const globalStepEngine = this.provider.modules.globalStepEngine;
                         const persistence = this.provider.modules.persistence;
                         const rowEdition = input.rowEdition;
                         const layout: LayoutBase = input.layout;
 
+                        let removedErrorsAcc: number[] = [];
                         for (const step of layout.globalSteps) {
 
                             let rowIds: number[] = step.reprocessAllRowsOnChange ? undefined : [parseInt(rowEdition.rowId)];
-                            if (step.reprocessAllRowsOnChange) {
-                                const stream = globalStepEngine.handleStep(step, persistence, signal, rowIds);
-                                const resultStream = stream.pipeThrough(new TransformStream({
-                                    transform: async ({ rows, errors, removedErrors }: any, controller) => {
-                                        removedErrors = removedErrors ?? [];
-                                        controller.enqueue({ rawRows: rows, errorDicc: errors, metrics: null });
-                                    }
-                                }));
-                                await persistence.saveStream(resultStream, signal);
+                            const stream = persistence.getRowsStream({ ...step.filter.rows, rowIdIn: rowIds });
+                            
+                            const resultStream = globalStepEngine.handleStep(stream, step, null, signal);
+                            const parsedStream = resultStream.pipeThrough(new TransformStream({
+                                transform: async ({ rows, errors, removedErrors }: any, controller) => {
+                                    removedErrorsAcc.push(...(removedErrors ?? []));
+                                    controller.enqueue({ rawRows: rows, errorDicc: errors });
+                                }
+                            }));
+
+                            await persistence.saveStream(parsedStream, null, null, signal);
+                            if (removedErrorsAcc.length > 0) {
+                                persistence.deleteErrors(removedErrorsAcc);
                             }
                         }
 
-                        await persistence.updateMetricsSaved();
+                        assign({ processingRows: false });
                     }),
                     removingRow: fromPromise(async ({ input, signal }: any) => {
+                        assign({ processingRows: true });
+
                         const persistence = this.provider.modules.persistence;
                         await persistence.deleteRow(input.removingRow.rowId);
-                        await persistence.updateMetricsSaved();
+                        await persistence.updateMetrics();
+
+                        assign({ processingRows: false });
                     }),
                     exporting: fromPromise(async ({ input, signal }: any) => {
                         const exporter = this.provider.modules.exporter;
