@@ -31,14 +31,7 @@ export default defineConfig({
     environment: "node",
   },
   build: {
-    minify: "terser",
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-      },
-      mangle: true,
-    },
+    minify: false,
     lib: {
       entry: resolve(__dirname, "src/index.ts"),
       name: "ETLCoreStream",
@@ -47,6 +40,9 @@ export default defineConfig({
     },
     rollupOptions: {
       external: ["xstate", "rxjs", "papaparse", "@preact/signals-core", "@xstate/graph"],
+      output: {
+        exports: "named",
+      },
     },
     sourcemap: false,
     emptyOutDir: true,
