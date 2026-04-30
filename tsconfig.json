@@ -8,8 +8,9 @@
       "@/*": ["./src/*"],
       "@core/*": ["./src/core/*"],
       "@shared/*": ["./src/shared/*"],
-      "@schemes/*": ["./src/shared/schemes/*"]
-    }    
+      "@schemes/*": ["./src/shared/schemes/*"],
+      "@examples/*": ["./src/examples/*"]
+    }
   },
-  "include": ["src/**/*", "examples"]
+  "include": ["src/**/*.ts"]
 }
