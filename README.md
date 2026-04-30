@@ -582,12 +582,6 @@ ETL CoreStream is built for the community. Contributions welcome:
 
 ---
 
-## 📄 License
-
-[Your license here]
-
----
-
 ## 💡 What Makes ETL CoreStream Different?
 
 Most ETL tools freeze your UI. They load everything into memory. They're opinionated and rigid. ETL CoreStream breaks that pattern:
