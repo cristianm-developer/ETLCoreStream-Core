@@ -9,6 +9,7 @@ import type {
 } from "../i-import-file-module";
 import { DEFAULT_IMPORT_FILE_MODULE_OPTIONS } from "../i-import-file-module";
 import { Signal } from "@preact/signals-core";
+import { isWorkerSupported } from "@/shared/utils/isWorkerSupported";
 
 export type { ImportFileModuleOptions as StreamConfig, StreamControls, StreamResult };
 export { DEFAULT_IMPORT_FILE_MODULE_OPTIONS as DEFAULT_STREAM_CONFIG };
@@ -26,6 +27,11 @@ export class ImportFilePapaparseModule implements IImportFileModule {
   constructor(logger: LoggerModule, config: ImportFileModuleOptions = {}) {
     this.logger = logger;
     this.config = { ...DEFAULT_IMPORT_FILE_MODULE_OPTIONS, ...config };
+
+    if(!isWorkerSupported()) {
+      this.config.worker = false;
+    }
+
     this.logger.log("ImportFilePapaparseModule initialized", "debug", "constructor", this.id);
   }
 
