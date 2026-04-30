@@ -1,4 +1,4 @@
-export type OrchestatorStateType =
+export type OrchestratorStateType =
   | "initializing"
   | "waiting-layout"
   | "waiting-file"

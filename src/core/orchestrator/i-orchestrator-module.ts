@@ -1,5 +1,5 @@
-import type { OrchestatorContext } from "./schemes/orchestator-context";
-import type { OrchestatorStateType } from "./schemes/orchestator-states";
+import type { OrchestratorContext } from "./schemes/orchestrator-context";
+import type { OrchestratorStateType } from "./schemes/orchestrator-states";
 import type { LayoutBase } from "@/shared/schemes/layout-base";
 import type { Log } from "@/shared/schemes/log";
 import type { Observable } from "rxjs";
@@ -10,23 +10,23 @@ export interface IOrchestratorModule {
   initialize(provider: ProviderModule, id?: string): void;
 
   /* layout management */
-  setLayout: (layout: LayoutBase) => void;
-  getLayout: () => LayoutBase | null;
+  getLayout: () => LayoutBase | null;  
 
   /* identity / state / context */
   getId(): string;
   getCurrentState(): string;
-  getCurrentContext(): OrchestatorContext;
+  getCurrentContext(): OrchestratorContext;
 
   /* reactive observables exposed by the module */
   progress$: Observable<{ label: string; value: number | null }[]>;
-  state$: Observable<OrchestatorStateType>;
-  context$: Observable<OrchestatorContext>;
-  metrics$: Observable<OrchestatorContext["metrics"]>;
+  state$: Observable<OrchestratorStateType>;
+  context$: Observable<OrchestratorContext>;
+  metrics$: Observable<OrchestratorContext["metrics"]>;
   logs$: Observable<Log>;
+  file$: Observable<File | null>;
   /* raw signals (for consumers that use Preact signals) */
-  stateSignal: Signal<OrchestatorStateType>;
-  metricsSignal: Signal<OrchestatorContext["metrics"]>;
+  stateSignal: Signal<OrchestratorStateType>;
+  metricsSignal: Signal<OrchestratorContext["metrics"]>;
 
   /* helper to retrieve logs synchronously from the logger */
   getLogs(

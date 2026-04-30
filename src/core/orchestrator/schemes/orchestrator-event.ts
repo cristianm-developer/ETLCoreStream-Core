@@ -1,6 +1,6 @@
 import type { LayoutBase } from "@/shared/schemes/layout-base";
 
-export type OrchestatorEvent =
+export type OrchestratorEvent =
   | { type: "LAYOUT_SELECTED"; layout: LayoutBase }
   | { type: "FILE_SELECTED"; file: File }
   | { type: "CHANGE_PAGE"; pageNumber: number }

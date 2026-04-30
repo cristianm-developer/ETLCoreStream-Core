@@ -2,7 +2,7 @@ import type { ValidationError } from "@/shared/schemes/local-step-validators";
 import type { RowFilter } from "@/shared/schemes/persistent-filter";
 import type { RowObject } from "@/shared/schemes/row-object";
 
-export interface OrchestatorContext {
+export interface OrchestratorContext {
   file: File | null;
   activeStream: ReadableStream | null;
   layout: any | null;

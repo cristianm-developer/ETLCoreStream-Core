@@ -1,20 +1,20 @@
 import type { LayoutBase } from "@/shared/schemes/layout-base";
 import type { ILoggerModule } from "../logger/i-logger-module";
 import type { ProviderModule } from "../provider/main";
-import type { OrchestatorContext } from "./schemes/orchestator-context";
+import type { OrchestratorContext } from "./schemes/orchestrator-context";
 import type { Observable } from "rxjs";
-import { BehaviorSubject } from "rxjs";
-import type { OrchestatorStateType } from "./schemes/orchestator-states";
+import { BehaviorSubject, distinctUntilChanged, from, map, Subscription } from "rxjs";
+import type { OrchestratorStateType } from "./schemes/orchestrator-states";
 import type { Log } from "@/shared/schemes/log";
-import type { ActorRefFrom, Subscription } from "xstate";
+import type { ActorRefFrom } from "xstate";
 import { assign, createActor, createMachine, fromPromise } from "xstate";
 import type { Signal } from "@preact/signals-core";
 import { signal } from "@preact/signals-core";
-import type { OrchestatorEvent } from "./schemes/orchestator-event";
+import type { OrchestratorEvent } from "./schemes/orchestrator-event";
 import type { RowObject } from "@/shared/schemes/row-object";
 import type { IOrchestratorModule } from "./i-orchestrator-module";
 
-const DEFAULT_CONTEXT: OrchestatorContext = {
+const DEFAULT_CONTEXT: OrchestratorContext = {
   file: null,
   layout: null,
   metrics: undefined,
@@ -42,38 +42,40 @@ export class OrchestratorModule implements IOrchestratorModule {
   private provider!: ProviderModule;
   private logger!: ILoggerModule;
 
-  private stateSubject: BehaviorSubject<OrchestatorStateType> =
-    new BehaviorSubject<OrchestatorStateType>("initializing");
-  private contextSubject: BehaviorSubject<OrchestatorContext> =
-    new BehaviorSubject<OrchestatorContext>(DEFAULT_CONTEXT);
-  private metricsSubject: BehaviorSubject<OrchestatorContext["metrics"]> = new BehaviorSubject<
-    OrchestatorContext["metrics"]
+  private stateSubject: BehaviorSubject<OrchestratorStateType> =
+    new BehaviorSubject<OrchestratorStateType>("initializing");
+  private contextSubject: BehaviorSubject<OrchestratorContext> =
+    new BehaviorSubject<OrchestratorContext>(DEFAULT_CONTEXT);
+  private metricsSubject: BehaviorSubject<OrchestratorContext["metrics"]> = new BehaviorSubject<
+    OrchestratorContext["metrics"]
   >(DEFAULT_CONTEXT.metrics);
-
-  private actorSubscription: Subscription | undefined;
 
   private progressSubject: BehaviorSubject<{ label: string; value: number | null }[]> =
     new BehaviorSubject<{ label: string; value: number | null }[]>(DEFAULT_CONTEXT.progress);
   readonly progress$: Observable<{ label: string; value: number | null }[]> =
     this.progressSubject.asObservable();
 
-  public stateSignal: Signal<OrchestatorStateType> = signal<OrchestatorStateType>("initializing");
+  public stateSignal: Signal<OrchestratorStateType> = signal<OrchestratorStateType>("initializing");
   get state() {
     return this.stateSignal.value;
   }
-  state$!: Observable<OrchestatorStateType>;
-  public metricsSignal: Signal<OrchestatorContext["metrics"]> = signal<
-    OrchestatorContext["metrics"]
+  state$!: Observable<OrchestratorStateType>;
+  public metricsSignal: Signal<OrchestratorContext["metrics"]> = signal<
+    OrchestratorContext["metrics"]
   >(DEFAULT_CONTEXT.metrics);
   get metrics() {
     return this.metricsSignal?.value;
   }
-  metrics$!: Observable<OrchestatorContext["metrics"]>;
+  metrics$!: Observable<OrchestratorContext["metrics"]>;
 
-  context$!: Observable<OrchestatorContext>;
+  context$!: Observable<OrchestratorContext>;
   logs$!: Observable<Log>;
 
-  setLayout!: (layout: LayoutBase) => void;
+  fileSubject: BehaviorSubject<File | null> = new BehaviorSubject<File | null>(null);
+  file$!: Observable<File | null>;
+
+  private subscriptions = new Subscription();
+
   getLayout!: () => LayoutBase | null;
 
   getId = (): string => this.id;
@@ -88,8 +90,8 @@ export class OrchestratorModule implements IOrchestratorModule {
     }
     return value as unknown as string;
   };
-  getCurrentContext = (): OrchestatorContext =>
-    this.actor?.getSnapshot().context as OrchestatorContext;
+  getCurrentContext = (): OrchestratorContext =>
+    this.actor?.getSnapshot().context as OrchestratorContext;
 
   getLogs = (
     fromTime?: Date,
@@ -120,8 +122,8 @@ export class OrchestratorModule implements IOrchestratorModule {
         initial: "initializing",
         context: DEFAULT_CONTEXT,
         types: {} as {
-          context: OrchestatorContext;
-          events: OrchestatorEvent;
+          context: OrchestratorContext;
+          events: OrchestratorEvent;
           children: {
             "import-file": { output: ReadableStream<any> };
             mapping: { output: undefined };
@@ -783,19 +785,53 @@ export class OrchestratorModule implements IOrchestratorModule {
 
     this.actor = createActor(this.machine!);
 
-    this.actorSubscription = this.actor.subscribe((snapshot) => {
-      const { value, context } = snapshot;
+    const snapshot$ = from(this.actor);
 
-      this.stateSubject.next(value as OrchestatorStateType);
-      this.contextSubject.next(context as OrchestatorContext);
-      this.metricsSubject.next(context.metrics);
-      this.progressSubject.next(
-        context.progress.filter((e: { label: string; value: number | null }) => e.value !== null)
-      );
+    this.subscriptions.add(snapshot$.pipe(
+      map(s => s.value as OrchestratorStateType),
+      distinctUntilChanged()
+    ).subscribe(val => {
+      this.stateSubject.next(val as OrchestratorStateType);
+      this.stateSignal.value = val as OrchestratorStateType;
+    }));
 
-      this.stateSignal.value = value as OrchestatorStateType;
-      this.metricsSignal.value = context.metrics;
-    });
+    this.subscriptions.add(
+      snapshot$.pipe(
+        map(s => s.context.metrics as OrchestratorContext["metrics"]),
+        distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
+      ).subscribe(val => {
+        this.metricsSubject.next(val);
+        this.metricsSignal.value = val;
+      })
+    );
+
+    this.subscriptions.add(
+      snapshot$.pipe(
+        map(s => s.context.progress.filter((e: any) => e.value !== null)),
+        distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
+      ).subscribe(val => {
+        this.progressSubject.next(val);
+      })
+    );
+
+    this.subscriptions.add(
+      snapshot$.pipe(
+        map(s => s.context.file ?? null),
+        distinctUntilChanged((prev, curr) => prev?.name === curr?.name)
+      ).subscribe(val => {
+        this.fileSubject.next(val);
+      })
+    );
+
+    this.subscriptions.add(
+      snapshot$.pipe(
+        map(s => s.context as OrchestratorContext),
+        distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
+      ).subscribe(val => {
+        this.contextSubject.next(val);
+      })
+    )
+    
 
     this.actor.start();
   };
@@ -806,11 +842,15 @@ export class OrchestratorModule implements IOrchestratorModule {
     this.logger.log("Orchestrator stopping...", "info", "stop", this.id);
 
     this.actor.stop();
-    this.actorSubscription?.unsubscribe();
+    this.subscriptions.unsubscribe();
+
+    this.subscriptions = new Subscription();
 
     this.contextSubject.complete();
     this.stateSubject.complete();
     this.metricsSubject.complete();
+    this.progressSubject.complete();
+    this.fileSubject.complete();
     this.cleanPersistence();
 
     this.logger.log("Orchestrator stopped", "info", "stop", this.id);
