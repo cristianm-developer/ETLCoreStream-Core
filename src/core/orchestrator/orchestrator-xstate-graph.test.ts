@@ -1,17 +1,17 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { OrchestatorModule } from './main';
-import { ProviderModule } from '../provider/main';
-import { ILoggerModule } from '../logger/i-logger-module';
-import { LayoutBase } from '@/shared/schemes/layout-base';
-import { BehaviorSubject } from 'rxjs';
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { OrchestratorModule } from "./main";
+import { ProviderModule } from "../provider/main";
+import { ILoggerModule } from "../logger/i-logger-module";
+import { LayoutBase } from "@/shared/schemes/layout-base";
+import { BehaviorSubject } from "rxjs";
 
-describe('OrchestatorModule - XState Graph Integration', () => {
+describe("OrchestatorModule - XState Graph Integration", () => {
   let mockProvider: ProviderModule;
   let mockLogger: ILoggerModule;
 
   const mockLayout: LayoutBase = {
-    id: 'test-layout',
-    name: 'Test Layout',
+    id: "test-layout",
+    name: "Test Layout",
     columns: [],
     localSteps: [],
     globalSteps: [],
@@ -19,8 +19,8 @@ describe('OrchestatorModule - XState Graph Integration', () => {
     filter: undefined,
   } as any;
 
-  const mockFile = new File(['col1,col2\nval1,val2\nval3,val4'], 'test.csv', {
-    type: 'text/csv',
+  const mockFile = new File(["col1,col2\nval1,val2\nval3,val4"], "test.csv", {
+    type: "text/csv",
   }) as any;
 
   beforeEach(() => {
@@ -40,7 +40,7 @@ describe('OrchestatorModule - XState Graph Integration', () => {
       getRowsStream: vi.fn().mockReturnValue(ReadableStream.prototype as any),
       getMetrics: vi.fn().mockResolvedValue({
         totalRows: 2,
-        fileName: 'test',
+        fileName: "test",
         errorCount: 0,
         processedRows: 2,
       }),
@@ -49,8 +49,8 @@ describe('OrchestatorModule - XState Graph Integration', () => {
     const mockViewer = {
       getRowsWithPagination: vi.fn().mockResolvedValue({
         rows: [
-          { _id: 1, col1: 'val1', col2: 'val2' },
-          { _id: 2, col1: 'val3', col2: 'val4' },
+          { _id: 1, col1: "val1", col2: "val2" },
+          { _id: 2, col1: "val3", col2: "val4" },
         ],
         errors: [],
       }),
@@ -91,43 +91,43 @@ describe('OrchestatorModule - XState Graph Integration', () => {
     } as any;
   });
 
-  describe('Basic State Transitions', () => {
-    it('should initialize and reach waiting-layout state', async () => {
-      const orchestrator = new OrchestatorModule();
+  describe("Basic State Transitions", () => {
+    it("should initialize and reach waiting-layout state", async () => {
+      const orchestrator = new OrchestratorModule();
       orchestrator.initialize(mockProvider);
 
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       const state = orchestrator.getCurrentState();
-      expect(['initializing', 'waiting-layout']).toContain(state);
+      expect(["initializing", "waiting-layout"]).toContain(state);
 
       orchestrator.stop();
     }, 10000);
 
-    it('should handle layout selection', async () => {
-      const orchestrator = new OrchestatorModule();
+    it("should handle layout selection", async () => {
+      const orchestrator = new OrchestratorModule();
       orchestrator.initialize(mockProvider);
 
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 150));
       orchestrator.selectLayout(mockLayout);
 
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       const context = orchestrator.getCurrentContext();
       expect(context.layout).toEqual(mockLayout);
 
       orchestrator.stop();
     }, 10000);
 
-    it('should handle file selection', async () => {
-      const orchestrator = new OrchestatorModule();
+    it("should handle file selection", async () => {
+      const orchestrator = new OrchestratorModule();
       orchestrator.initialize(mockProvider);
 
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 150));
       orchestrator.selectLayout(mockLayout);
 
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       orchestrator.selectFile(mockFile);
 
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
       const context = orchestrator.getCurrentContext();
       expect(context.file).toEqual(mockFile);
 
@@ -135,18 +135,18 @@ describe('OrchestatorModule - XState Graph Integration', () => {
     }, 10000);
   });
 
-  describe('Complex Workflows', () => {
-    it('should handle multiple operations sequentially', async () => {
-      const orchestrator = new OrchestatorModule();
+  describe("Complex Workflows", () => {
+    it("should handle multiple operations sequentially", async () => {
+      const orchestrator = new OrchestratorModule();
       orchestrator.initialize(mockProvider);
 
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 150));
       orchestrator.selectLayout(mockLayout);
 
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       orchestrator.selectFile(mockFile);
 
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       // Verify state is defined and context is populated
       const state = orchestrator.getCurrentState();
@@ -159,20 +159,20 @@ describe('OrchestatorModule - XState Graph Integration', () => {
       orchestrator.stop();
     }, 10000);
 
-    it('should handle reset', async () => {
-      const orchestrator = new OrchestatorModule();
+    it("should handle reset", async () => {
+      const orchestrator = new OrchestratorModule();
       orchestrator.initialize(mockProvider);
 
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 150));
       orchestrator.selectLayout(mockLayout);
 
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       const contextBeforeReset = orchestrator.getCurrentContext();
       expect(contextBeforeReset.layout).toBe(mockLayout);
 
       orchestrator.reset();
 
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 150));
       const contextAfterReset = orchestrator.getCurrentContext();
       expect(contextAfterReset.layout).toBeNull();
       expect(contextAfterReset.file).toBeNull();
@@ -181,9 +181,9 @@ describe('OrchestatorModule - XState Graph Integration', () => {
     }, 10000);
   });
 
-  describe('Observable Emission', () => {
-    it('should emit state changes', async () => {
-      const orchestrator = new OrchestatorModule();
+  describe("Observable Emission", () => {
+    it("should emit state changes", async () => {
+      const orchestrator = new OrchestratorModule();
       orchestrator.initialize(mockProvider);
 
       const emissions: string[] = [];
@@ -192,15 +192,15 @@ describe('OrchestatorModule - XState Graph Integration', () => {
         emissions.push(state);
       });
 
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise((resolve) => setTimeout(resolve, 300));
 
       orchestrator.stop();
 
       expect(emissions.length).toBeGreaterThan(0);
     }, 10000);
 
-    it('should emit context changes', async () => {
-      const orchestrator = new OrchestatorModule();
+    it("should emit context changes", async () => {
+      const orchestrator = new OrchestratorModule();
       orchestrator.initialize(mockProvider);
 
       const contextSnapshots: any[] = [];
@@ -209,10 +209,10 @@ describe('OrchestatorModule - XState Graph Integration', () => {
         contextSnapshots.push(context);
       });
 
-      await new Promise(resolve => setTimeout(resolve, 150));
+      await new Promise((resolve) => setTimeout(resolve, 150));
       orchestrator.selectLayout(mockLayout);
 
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       orchestrator.stop();
 

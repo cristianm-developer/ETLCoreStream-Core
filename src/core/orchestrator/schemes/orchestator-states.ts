@@ -1,0 +1,16 @@
+export type OrchestatorStateType =
+  | "initializing"
+  | "waiting-layout"
+  | "waiting-file"
+  | "importing"
+  | "mapping"
+  | "handling-local-step"
+  | "persisting"
+  | "handle-global-steps"
+  | "initializing-user-view"
+  | "waiting-final-processing"
+  | "waiting-user"
+  | "editing-row"
+  | "removing-row"
+  | "exporting"
+  | "error";
