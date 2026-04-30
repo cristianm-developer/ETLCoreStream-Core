@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { RowObject } from "@/shared/schemes/row-object";
+import type { RowObject } from "@/shared/schemes/row-object";
 
 // Setup global mocks FIRST before any imports
 global.document = {} as any;
@@ -24,28 +24,26 @@ global.TextDecoder = class {
   }
 } as any;
 
-// Mock streamsaver as default export
-vi.mock("streamsaver", () => {
-  const mockCreateWriteStream = vi.fn();
-  return {
-    default: {
-      createWriteStream: mockCreateWriteStream,
-    },
-  };
-});
+const streamSaverMocks = vi.hoisted(() => ({
+  createWritable: vi.fn(),
+}));
+
+vi.mock("streamsaver", () => ({
+  default: {
+    createWritable: streamSaverMocks.createWritable,
+  },
+}));
 
 vi.mock("@core/logger/logger-native/main");
 
 import { ExporterNativeModule } from "./main";
 import { LoggerModule } from "@core/logger/logger-native/main";
-import streamsaver from "streamsaver";
 
 describe("ExporterNativeModule", () => {
   let exporter: ExporterNativeModule;
   let mockLogger: any;
   let mockWriter: any;
   let mockFileStream: any;
-  let createWriteStreamSpy: any;
 
   const createMockRowObject = (overrides?: Partial<RowObject>): RowObject => ({
     __rowId: 1,
@@ -75,12 +73,7 @@ describe("ExporterNativeModule", () => {
 
     vi.mocked(LoggerModule).mockImplementation(() => mockLogger);
 
-    // Correctly mock the createWriteStream function
-    createWriteStreamSpy = vi.fn().mockReturnValue(mockFileStream);
-    Object.defineProperty(streamsaver, "createWriteStream", {
-      value: createWriteStreamSpy,
-      writable: true,
-    });
+    streamSaverMocks.createWritable.mockResolvedValue(mockFileStream);
 
     exporter = new ExporterNativeModule(mockLogger);
   });
@@ -202,7 +195,7 @@ describe("ExporterNativeModule", () => {
 
       await exporter.exportToCsv(mockInputStream, 1, "test");
 
-      expect(createWriteStreamSpy).toHaveBeenCalledWith("test.csv");
+      expect(streamSaverMocks.createWritable).toHaveBeenCalledWith("test.csv");
     });
 
     it("should not add .csv extension if filename already has it", async () => {
@@ -221,7 +214,7 @@ describe("ExporterNativeModule", () => {
 
       await exporter.exportToCsv(mockInputStream, 1, "test.csv");
 
-      expect(createWriteStreamSpy).toHaveBeenCalledWith("test.csv");
+      expect(streamSaverMocks.createWritable).toHaveBeenCalledWith("test.csv");
     });
 
     it("should write CSV header when diccLabels is provided", async () => {

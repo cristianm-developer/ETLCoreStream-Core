@@ -19,36 +19,33 @@ describe("GlobalStepsEngineModule", () => {
 
   const createMockTransform = (overrides?: Partial<GlobalStepTransform>): GlobalStepTransform => ({
     name: "testTransform",
-    reprocessAllRowsOnChange: false,
-    fn: vi.fn(async ({ rows }) => {
+    fn: vi.fn(async (rows: RowObject[]) => {
       rows.forEach((r) => {
         r.value = { ...r.value, transformed: true };
       });
     }),
     args: [],
-    filter: { rows: {} as RowFilter },
     ...overrides,
   });
 
   const createMockValidator = (overrides?: Partial<GlobalStepValidator>): GlobalStepValidator => ({
     name: "testValidator",
     headerKey: "name",
-    reprocessAllRowsOnChange: false,
-    fn: vi.fn(async ({ rows }) => ({
+    fn: vi.fn(async (_rows: RowObject[]) => ({
       validationErrors: [],
       removedValidationErrors: [],
     })),
     args: [],
-    filter: { rows: {} as RowFilter, errors: {} as any },
     ...overrides,
   });
 
   const createMockGlobalStep = (overrides?: Partial<GlobalStep>): GlobalStep => {
-    const step: GlobalStep = {
+    const step = {
       name: "global-step-1",
-      order: ["validators", "transforms"] as any,
+      reprocessAllRowsOnChange: false,
+      order: ["validators", "transforms"] as GlobalStep["order"],
       filter: {
-        rowsFilter: vi.fn((filter: RowFilter) => {
+        rows: vi.fn((_filter: RowFilter) => {
           return new ReadableStream({
             start(controller) {
               controller.enqueue({
@@ -58,19 +55,13 @@ describe("GlobalStepsEngineModule", () => {
             },
           });
         }),
-        errorsFn: vi.fn((filter) => {
-          return new ReadableStream({
-            start(controller) {
-              controller.close();
-            },
-          });
-        }),
+        errors: {},
       },
       transforms: [createMockTransform()],
       validators: [createMockValidator()],
       ...overrides,
     };
-    return step;
+    return step as GlobalStep;
   };
 
   const createMockLayout = (overrides?: Partial<LayoutBase>): LayoutBase => ({
@@ -81,6 +72,7 @@ describe("GlobalStepsEngineModule", () => {
     localSteps: [],
     allowUndefinedColumns: false,
     headers: [],
+    exports: {},
     ...overrides,
   });
 
@@ -111,6 +103,7 @@ describe("GlobalStepsEngineModule", () => {
     clear: vi.fn().mockResolvedValue(undefined),
     updateRows: vi.fn().mockResolvedValue(undefined),
     deleteRows: vi.fn().mockResolvedValue(undefined),
+    deleteRow: vi.fn().mockResolvedValue(undefined),
   });
 
   beforeEach(() => {
@@ -194,11 +187,11 @@ describe("GlobalStepsEngineModule", () => {
           {
             ...createMockGlobalStep(),
             filter: {
-              rowsFn: () => {
+              rows: () => {
                 throw new Error("Source error");
               },
-              errorsFn: () => new ReadableStream(),
-            } as any,
+              errors: {},
+            } as GlobalStep["filter"],
           },
         ],
       });
@@ -349,9 +342,9 @@ describe("GlobalStepsEngineModule", () => {
       ).rejects.toThrow();
     });
 
-    it("should use source rowsFn when no input stream provided", async () => {
-      const rowsFnMock = vi.fn(
-        () =>
+    it("should use filter.rows when no input stream provided", async () => {
+      const rowsMock = vi.fn(
+        (_filter: RowFilter) =>
           new ReadableStream({
             start(controller) {
               controller.enqueue({ rows: [createMockRowObject()] });
@@ -363,14 +356,15 @@ describe("GlobalStepsEngineModule", () => {
       const transform = createMockTransform();
       const step = createMockGlobalStep({
         filter: {
-          rowsFilter: rowsFnMock,
-          errorsFn: vi.fn(),
+          rows: rowsMock as unknown as GlobalStep["filter"]["rows"],
+          errors: {},
         },
       });
 
       const resultStream = await stepsEngineModule["handleStepTransform"](step, transform);
 
-      expect(rowsFnMock).toHaveBeenCalled();
+      expect(rowsMock).toHaveBeenCalled();
+      await resultStream.cancel();
     });
 
     it("should update status on transform completion", async () => {
@@ -636,6 +630,10 @@ describe("GlobalStepsEngineModule", () => {
       await stepsEngineModule["saveValidationResult"](stream);
 
       expect(mockPersistenceModule.saveStream).toHaveBeenCalled();
+      expect(mockPersistenceModule.deleteRow).toHaveBeenCalledTimes(3);
+      expect(mockPersistenceModule.deleteRow).toHaveBeenCalledWith(1);
+      expect(mockPersistenceModule.deleteRow).toHaveBeenCalledWith(2);
+      expect(mockPersistenceModule.deleteRow).toHaveBeenCalledWith(3);
     });
 
     it("should mark rows with errors", async () => {
@@ -696,8 +694,8 @@ describe("GlobalStepsEngineModule", () => {
 
       await stepsEngineModule["saveValidationResult"](stream);
 
-      // Verify deleteRows would be called via the stream pipeline
       expect(mockPersistenceModule.saveStream).toHaveBeenCalled();
+      expect(mockPersistenceModule.deleteRow).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -766,7 +764,7 @@ describe("GlobalStepsEngineModule", () => {
 
     it("should handle validation errors across multiple rows", async () => {
       const validator = createMockValidator({
-        fn: vi.fn(async ({ rows }) => ({
+        fn: vi.fn(async (rows: RowObject[]) => ({
           validationErrors: rows.map(
             (r) =>
               ({
@@ -781,10 +779,10 @@ describe("GlobalStepsEngineModule", () => {
       });
 
       const step = createMockGlobalStep({
-        order: ["validators"] as any,
+        order: ["validators"] as GlobalStep["order"],
         validators: [validator],
         filter: {
-          rowsFilter: () =>
+          rows: (() =>
             new ReadableStream({
               start(controller) {
                 controller.enqueue({
@@ -792,8 +790,8 @@ describe("GlobalStepsEngineModule", () => {
                 });
                 controller.close();
               },
-            }),
-          errorsFn: vi.fn(),
+            })) as unknown as GlobalStep["filter"]["rows"],
+          errors: {},
         },
       });
 

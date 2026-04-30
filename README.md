@@ -1,5 +1,11 @@
 # ETL CoreStream
 
+## Installation
+
+```bash
+npm install @etl-corestream/core
+```
+
 ## Process Massive Files with Lightning-Fast Speed, No Freezing
 
 **ETL CoreStream** is a revolutionary, headless ETL orchestration library built for the modern web. Handle massive files—gigabytes of data—with stream-friendly, async processing that keeps your application **unfrozen and responsive** while maintaining perfect control over performance.
@@ -338,17 +344,13 @@ ETL CoreStream is designed to keep your data under your control:
 
 ---
 
-### Installation
+## Getting started
 
-```bash
-npm install etl-corestream/core
-```
-
-### Basic Usage
+### Basic usage
 
 ```typescript
-import { OrchestatorModule, ProviderModule } from "etl-corestream/core";
-import { DefaultImporter, IndexedDBPersistence } from "etl-corestream/core/adapters";
+import { OrchestatorModule, ProviderModule } from "@etl-corestream/core";
+import { DefaultImporter, IndexedDBPersistence } from "@etl-corestream/core/adapters";
 
 // Create provider with default adapters
 const provider = new ProviderModule({
@@ -601,7 +603,7 @@ Most ETL tools freeze your UI. They load everything into memory. They're opinion
 ## 🚀 Ready to Transform Your Data?
 
 ```bash
-npm install etl-corestream/core
+npm install @etl-corestream/core
 ```
 
 Build amazing data processing experiences. Keep your UI responsive. Handle massive files effortlessly.

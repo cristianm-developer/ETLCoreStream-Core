@@ -7,6 +7,19 @@ import eslint from "vite-plugin-eslint";
 export default defineConfig({
   plugins: [
     dts({
+      include: ["src"],
+      insertTypesEntry: true,
+      exclude: [
+        "src/**/*.test.ts",
+        "src/setupTests.ts",
+      ],
+      entryRoot: "src",
+      cleanVueFileName: true,
+      staticImport: true,
+      compilerOptions: {
+        declarationDir: "dist",
+        baseUrl: ".",
+      }
     }),
     eslint(),
   ],

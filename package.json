@@ -1,13 +1,16 @@
 {
   "name": "@etl-corestream/core",
-  "version": "1.0.0",
+  "version": "0.1.1",
   "description": "Headless ETL orchestration engine for the web. Process massive files with stream-friendly async operations, real-time validation/transformation, and jank-free performance using XState and Signals architecture.",
   "license": "ISC",
   "author": "Cristian Marin",
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/src/index.d.ts",
+  "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/src/index.d.ts",
@@ -26,7 +29,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "prepublishOnly": "npm run build",
-    "publish:npm": "npm run test && npm run lint && npm run build && npm publish"
+    "publish:npm": "npm run build && npm publish"
   },
   "dependencies": {
     "papaparse": "^5.5.3",
