@@ -5,6 +5,7 @@ Welcome! We're excited that you're interested in contributing to **`etl-corestre
 ## 🎯 Project Overview
 
 **`etl-corestream/core`** is:
+
 - **Headless**: No UI framework dependencies; compose with adapters for any deployment
 - **Modular**: Swap any module (importer, persistence, exporter, etc.) via the `ProviderModule` dependency injector
 - **Stream-based**: Uses `ReadableStream` pipes for responsive, non-blocking data processing
@@ -77,18 +78,21 @@ We welcome contributions in the following areas:
 Before contributing, understand these core principles:
 
 ### Stream-Based Processing
+
 - **Always use `ReadableStream`** for data transformations and bulk operations
 - **Never** load entire datasets into memory
 - Use `TransformStream` to compose validations, mappings, or filtering
 - Process data in **chunks**; emit early transition events when appropriate
 
 ### Non-Blocking Reactivity
+
 - Use `processingRows` flag to indicate background work without blocking user actions
 - Support early UI unlocking via events like `FIRST_CHUNK_RAW_READY`
 - Expose observables (`state$`, `context$`, `metrics$`, `progress$`) and signals for consumers
 - Cancellation via `AbortSignal` is essential for long-running operations
 
 ### Modularity & Interfaces
+
 - All modules implement `i-*.ts` interfaces (e.g., `IImporter`, `IPersistence`, `IMapper`)
 - The `ProviderModule` is the single composition point for dependency injection
 - Never hardcode external dependencies; accept them via constructor or configuration
@@ -96,6 +100,7 @@ Before contributing, understand these core principles:
 - Avoid framework-specific dependencies (React, Vue, Angular) in core; use adapters instead
 
 ### Resource Efficiency
+
 - **Memory**: Constant footprint regardless of dataset size (streaming + pagination)
 - **CPU**: Non-blocking operations, chunked processing, early transitions
 - **Storage**: Indexed queries, minimal duplication, lazy metrics
@@ -128,11 +133,11 @@ If your contribution directly impacts **this repository's core**, follow these g
 
 ```ts
 // src/core/global-step-engine/validators/my-validator.test.ts
-import { describe, it, expect } from 'vitest';
-import { MyValidator } from './my-validator';
+import { describe, it, expect } from "vitest";
+import { MyValidator } from "./my-validator";
 
-describe('MyValidator', () => {
-  it('should validate rows in chunks without loading all into memory', async () => {
+describe("MyValidator", () => {
+  it("should validate rows in chunks without loading all into memory", async () => {
     const validator = new MyValidator();
     const rows = generateRows(10000);
     const chunks: any[] = [];
@@ -147,10 +152,10 @@ describe('MyValidator', () => {
     }
 
     expect(chunks.length).toBeGreaterThan(0);
-    expect(chunks.every(c => c.rows.length > 0)).toBe(true);
+    expect(chunks.every((c) => c.rows.length > 0)).toBe(true);
   });
 
-  it('should respect AbortSignal for cancellation', async () => {
+  it("should respect AbortSignal for cancellation", async () => {
     const validator = new MyValidator();
     const abortController = new AbortController();
     const stream = infiniteStream(); // Never-ending stream
@@ -159,14 +164,14 @@ describe('MyValidator', () => {
 
     setTimeout(() => abortController.abort(), 100);
 
-    await expect(resultPromise).rejects.toThrow('abort');
+    await expect(resultPromise).rejects.toThrow("abort");
   });
 
-  it('should emit progress updates for long-running validations', async () => {
+  it("should emit progress updates for long-running validations", async () => {
     const validator = new MyValidator();
     const progressUpdates: string[] = [];
 
-    validator.on('progress', (label, percent) => {
+    validator.on("progress", (label, percent) => {
       progressUpdates.push(`${label}: ${percent}%`);
     });
 
@@ -214,13 +219,21 @@ npm test -- --coverage       # Coverage report
 ```ts
 // ❌ Breaking change - don't do this
 export interface IImporter {
-  readFileStream(file: File, signal: AbortSignal, newParam: string): Promise<[ReadableStream, number]>;
+  readFileStream(
+    file: File,
+    signal: AbortSignal,
+    newParam: string
+  ): Promise<[ReadableStream, number]>;
   // Old signature is gone!
 }
 
 // ✅ Backward-compatible change - do this
 export interface IImporter {
-  readFileStream(file: File, signal: AbortSignal, newParam?: string): Promise<[ReadableStream, number]>;
+  readFileStream(
+    file: File,
+    signal: AbortSignal,
+    newParam?: string
+  ): Promise<[ReadableStream, number]>;
   // Optional parameter is backward-compatible
 }
 
@@ -230,8 +243,12 @@ export interface IImporter {
    * @deprecated Use readFileStreamV2 instead. Will be removed in v3.0.0.
    */
   readFileStream(file: File, signal: AbortSignal): Promise<[ReadableStream, number]>;
-  
-  readFileStreamV2(file: File, signal: AbortSignal, newParam: string): Promise<[ReadableStream, number]>;
+
+  readFileStreamV2(
+    file: File,
+    signal: AbortSignal,
+    newParam: string
+  ): Promise<[ReadableStream, number]>;
 }
 ```
 
@@ -265,21 +282,27 @@ src/core/my-module/
 
 ```ts
 export class MyGlobalValidator implements IGlobalStepEngine {
-  async handleStep(stream: ReadableStream, step: GlobalStep, signal: AbortSignal): Promise<ReadableStream> {
-    return stream.pipeThrough(new TransformStream({
-      async transform(chunk, controller) {
-        // Process only this chunk, not entire dataset
-        const { rows, errors } = chunk;
-        const validated = await this.validateBatch(rows);  // Batch operation
-        
-        controller.enqueue({ rows: validated, errors });
-      }
-    }));
+  async handleStep(
+    stream: ReadableStream,
+    step: GlobalStep,
+    signal: AbortSignal
+  ): Promise<ReadableStream> {
+    return stream.pipeThrough(
+      new TransformStream({
+        async transform(chunk, controller) {
+          // Process only this chunk, not entire dataset
+          const { rows, errors } = chunk;
+          const validated = await this.validateBatch(rows); // Batch operation
+
+          controller.enqueue({ rows: validated, errors });
+        },
+      })
+    );
   }
 
   private async validateBatch(rows: RowObject[]): Promise<RowObject[]> {
     // Process rows in the batch without loading more
-    return rows.map(row => {
+    return rows.map((row) => {
       if (this.isValid(row)) {
         return row;
       }
@@ -293,20 +316,24 @@ export class MyGlobalValidator implements IGlobalStepEngine {
 
 ```ts
 export class BadGlobalValidator implements IGlobalStepEngine {
-  async handleStep(stream: ReadableStream, step: GlobalStep, signal: AbortSignal): Promise<ReadableStream> {
+  async handleStep(
+    stream: ReadableStream,
+    step: GlobalStep,
+    signal: AbortSignal
+  ): Promise<ReadableStream> {
     // THIS IS WRONG - DO NOT DO THIS
     const allRows: RowObject[] = [];
     const reader = stream.getReader();
-    
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      allRows.push(...value.rows);  // Loading entire dataset!
+      allRows.push(...value.rows); // Loading entire dataset!
     }
 
     // Now we have memory explosion on large files
-    const validated = allRows.map(row => this.validate(row));
-    
+    const validated = allRows.map((row) => this.validate(row));
+
     // ... more problematic code
   }
 }
@@ -331,6 +358,7 @@ If you modify any schema in `src/shared/schemes/`:
 2. **Create your changes** following guidelines above
 
 3. **Test thoroughly**
+
    ```bash
    npm test                      # All tests pass
    npm run build                 # Build succeeds
@@ -338,13 +366,14 @@ If you modify any schema in `src/shared/schemes/`:
    ```
 
 4. **Commit with clear messages**
+
    ```
    feat(global-validator): add chunked validation for large datasets
-   
+
    - Process rows in batches to maintain constant memory footprint
    - Add progress tracking for long-running validations
    - Support AbortSignal for cancellation
-   
+
    Fixes #123
    ```
 
@@ -369,25 +398,27 @@ If you modify any schema in `src/shared/schemes/`:
 
 ### Decide: Core Module or External Adapter?
 
-| Aspect | Core Module | External Adapter |
-|--------|-------------|------------------|
-| **Location** | This repository (`src/core/`) | Separate repository |
-| **Use case** | General ETL operations (import, persist, export, validate) | Framework/tool integration (React, Vue, PostgreSQL, AWS, etc.) |
-| **Scope** | Implements `i-*.ts` interface | Wraps core modules or exports for framework consumption |
-| **Dependencies** | Justified only (no framework-specific deps) | May depend on external libraries |
-| **Versioning** | Core versioning | Independent versioning |
-| **Publishing** | npm as `etl-corestream` | npm as `@org/adapter-name` |
-| **Example** | Global step validator, CSV importer | React hooks adapter, PostgreSQL persistence |
+| Aspect           | Core Module                                                | External Adapter                                               |
+| ---------------- | ---------------------------------------------------------- | -------------------------------------------------------------- |
+| **Location**     | This repository (`src/core/`)                              | Separate repository                                            |
+| **Use case**     | General ETL operations (import, persist, export, validate) | Framework/tool integration (React, Vue, PostgreSQL, AWS, etc.) |
+| **Scope**        | Implements `i-*.ts` interface                              | Wraps core modules or exports for framework consumption        |
+| **Dependencies** | Justified only (no framework-specific deps)                | May depend on external libraries                               |
+| **Versioning**   | Core versioning                                            | Independent versioning                                         |
+| **Publishing**   | npm as `etl-corestream`                                    | npm as `@org/adapter-name`                                     |
+| **Example**      | Global step validator, CSV importer                        | React hooks adapter, PostgreSQL persistence                    |
 
 ### Adding to Core
 
 If your module:
+
 - Implements a `i-*.ts` interface
 - Solves a general ETL problem (not tool-specific)
 - Provides value to most users
 - Is performant and resource-efficient
 
 **Then propose it as a core module:**
+
 1. Open an issue describing the module
 2. Discuss design and interface compliance
 3. Submit PR with full test coverage
@@ -396,11 +427,13 @@ If your module:
 #### About External Dependencies in Core
 
 Core modules **can depend on external packages** if justified. Currently, core depends on:
+
 - **xstate**: State machine orchestration (essential for complex workflows)
 - **RxJS**: Observable-based reactivity and composition patterns
 - **Preact Signals**: Fine-grained reactive state management
 
 **Justification criteria for adding new dependencies:**
+
 1. **Solves a fundamental problem** that can't be solved with existing dependencies
 2. **Zero framework bias** (no React, Vue, Angular, Svelte, etc.)
 3. **Small footprint** or widely adopted (prefer popular, well-maintained packages)
@@ -408,6 +441,7 @@ Core modules **can depend on external packages** if justified. Currently, core d
 5. **Unavoidable** - can't be made optional or deferred to adapters
 
 **Never add dependencies for:**
+
 - Framework integration (use adapters instead)
 - Backend-specific drivers (use adapters instead)
 - Nice-to-have features (keep core lean)
@@ -415,12 +449,14 @@ Core modules **can depend on external packages** if justified. Currently, core d
 ### Creating an Adapter
 
 If your module:
+
 - Integrates with a specific framework (React, Vue, Svelte)
 - Connects to a specific backend (PostgreSQL, Firebase, AWS)
 - Is niche or domain-specific
 - Might be versioned independently
 
 **Then create as an external adapter repository:**
+
 1. Create your own repository (separate from ETL CoreStream)
 2. Implement the orchestrator interfaces in your adapter
 3. **In your repository's README and package.json, reference ETL CoreStream**
@@ -429,7 +465,7 @@ If your module:
 
 #### Example: Publishing an Adapter Separately
 
-```
+````
 # Your adapter repository (independent)
 my-adapter-etl-corestream/
 ├── src/
@@ -450,11 +486,12 @@ This package provides React hooks and PostgreSQL persistence for [ETL CoreStream
 
 ```bash
 npm install @myorg/etl-corestream-react-postgres etl-corestream
-```
+````
 
 ## Usage
 
 See ETL CoreStream [ARCHITECTURE.md](https://github.com/crist.../ETL-CoreStream/blob/main/ARCHITECTURE.md) for core concepts.
+
 ```
 
 # In your package.json:
@@ -478,18 +515,22 @@ If you need to make **significant, incompatible changes** to core architecture:
 1. **Fork the repository**
 2. Make your changes
 3. **In your fork's README, include:**
+
    ```markdown
    ## About This Fork
-   
+
    This is a fork of [ETL CoreStream](link-to-original) with [describe major changes].
-   
+
    ### Differences from Upstream
+
    - [Change 1]
    - [Change 2]
-   
+
    ### Credit
+
    Original project by [original maintainers]. Built on ETL CoreStream's stream-based architecture.
    ```
+
 4. Feel free to publish as your own package if it solves a specific need
 5. Consider contributing back non-disruptive parts to core
 
@@ -523,10 +564,15 @@ export class MyCustomImporter implements IMyCustomImporter {
 }
 
 // 3. Test it
-describe('MyCustomImporter', () => {
-  it('should stream rows without loading entire file', async () => {
+describe("MyCustomImporter", () => {
+  it("should stream rows without loading entire file", async () => {
     const importer = new MyCustomImporter();
-    const file = new File([/* data */], 'test.csv');
+    const file = new File(
+      [
+        /* data */
+      ],
+      "test.csv"
+    );
     const [stream, estimate] = await importer.readFileStream(file, new AbortController().signal);
 
     let rowCount = 0;
@@ -544,7 +590,7 @@ const provider = new ProviderModule({
   modules: {
     importer: new MyCustomImporter(),
     // ... other modules
-  }
+  },
 });
 
 orchestrator.initialize(provider);

@@ -15,11 +15,13 @@ This document describes the architecture of **`etl-corestream/core`**, a modular
 ### 1. Modular Library with Dependency Injection
 
 **`etl-corestream/core`** is built as a **headless, provider-based system** where the `ProviderModule` acts as a dependency injector. Users can:
+
 - **Swap any module** (importer, mapper, persistence, viewer, exporter, etc.) while maintaining the same contract.
 - **Implement custom modules** by adhering to interface specifications (`i-importer.ts`, `i-persistence.ts`, etc.).
 - **Compose different implementations** at runtime based on deployment context or use case.
 
 **Benefits:**
+
 - Test different storage backends (IndexedDB, SQLite, PostgreSQL) without changing orchestrator logic.
 - Use different UI frameworks or render strategies (vanilla DOM, React, Vue) via adapter modules.
 - Replace importers to support new file formats or data sources.
@@ -28,11 +30,13 @@ This document describes the architecture of **`etl-corestream/core`**, a modular
 ### 2. Headless Library Design
 
 **`etl-corestream/core`** is **UI-agnostic and backend-agnostic**. It provides:
+
 - **Core ETL orchestration** without prescribing how data is rendered or persisted.
 - **Observable-based API** (`state$`, `context$`, `metrics$`, `progress$`) for consumers to build their own UI adapters.
 - **Stream-based architecture** that works equally well in browser, Node.js, or edge environments.
 
 **Adapters layer** (external to core):
+
 - **UI adapters**: React hooks, Vue composables, Svelte stores that consume orchestrator observables.
 - **Persistence adapters**: IndexedDB, localStorage, backend APIs, or file systems.
 - **Importer adapters**: CSV, JSON, Excel, API endpoints, databases.
@@ -43,22 +47,26 @@ This document describes the architecture of **`etl-corestream/core`**, a modular
 **`etl-corestream/core`** is designed to **maximize respect for user and system resources**:
 
 **Memory efficiency:**
+
 - **Stream-based processing**: data flows through pipes without holding entire datasets in memory.
 - **Pagination**: UI fetches only the current page of rows; large datasets remain in persistence.
 - **Lazy evaluation**: metadata and metrics are computed on-demand via `loadingMetrics` actor.
 - **Garbage collection**: streams complete and release resources; unused data is not retained.
 
 **CPU efficiency:**
+
 - **Non-blocking operations**: `processingRows` flag allows UI to remain responsive during heavy processing.
 - **Chunked processing**: streams process data in small batches, preventing long task runs that block the event loop.
 - **Concurrent user actions**: while background import/export/validation runs, users can interact with the UI (pagination, editing) without waiting.
 
 **Network efficiency (for backend adapters):**
+
 - **Stream chunking**: send/receive data in efficient batches rather than monolithic payloads.
 - **Pagination**: download only required pages of results.
 - **Cancellation support**: `AbortSignal` allows stopping in-flight requests when user cancels operations.
 
 **Storage efficiency:**
+
 - **Indexed storage**: persistence layer maintains indexed rows/errors for fast queries.
 - **Metrics caching**: computed metrics are cached and updated incrementally.
 - **Minimal duplication**: single source of truth in persistence; viewers read without copying.
@@ -85,36 +93,41 @@ This document describes the architecture of **`etl-corestream/core`**, a modular
 ### Observables (RxJS)
 
 Perfect for reactive frameworks and functional composition:
+
 ```ts
-orchestrator.state$.subscribe(state => {
-  console.log('State changed to:', state);
+orchestrator.state$.subscribe((state) => {
+  console.log("State changed to:", state);
 });
 
-orchestrator.context$.subscribe(context => {
-  console.log('Current context:', context);
+orchestrator.context$.subscribe((context) => {
+  console.log("Current context:", context);
 });
 
-orchestrator.metrics$.subscribe(metrics => {
-  console.log('Metrics updated:', metrics);
+orchestrator.metrics$.subscribe((metrics) => {
+  console.log("Metrics updated:", metrics);
 });
 
-orchestrator.progress$.subscribe(progress => {
-  console.log('Progress:', progress); // [{label: 'importing', value: 60}, ...]
+orchestrator.progress$.subscribe((progress) => {
+  console.log("Progress:", progress); // [{label: 'importing', value: 60}, ...]
 });
 ```
 
 ### Signals (Preact Signals)
 
 Perfect for synchronous, fine-grained reactivity and minimal re-renders:
+
 ```ts
 // Access current value synchronously
-const currentState = orchestrator.state;       // e.g., 'waiting-user'
-const currentMetrics = orchestrator.metrics;   // e.g., {totalRows: 1000, errorCount: 5}
+const currentState = orchestrator.state; // e.g., 'waiting-user'
+const currentMetrics = orchestrator.metrics; // e.g., {totalRows: 1000, errorCount: 5}
 
 // Use in reactive frameworks
-watch(() => orchestrator.state, (newState) => {
-  // React to state changes
-});
+watch(
+  () => orchestrator.state,
+  (newState) => {
+    // React to state changes
+  }
+);
 ```
 
 Both modes are **always available** and **synchronized**. Choose observables for stream-based logic, signals for immediate access to current values.
@@ -125,26 +138,27 @@ The Orchestrator maintains a central context that acts as a contract between mod
 
 ```ts
 const DEFAULT_CONTEXT: OrchestatorContext = {
-    file: null,
-    layout: null,
-    metrics: undefined,
-    progress: [],                    // Array of {label, value} for tracking multi-step operations
-    activeStream: null,              // Current ReadableStream being processed (null when idle)
-    unexpectedError: null,
-    editingRow: null,
-    removingRow: null,
-    exporting: null,
-    currentRowsFilter: null,         // Filter applied to current view
-    currentRows: null,               // Current page of rows (lazy-loaded from persistence)
-    currentErrors: null,             // Current page of errors (lazy-loaded from persistence)
-    currentPage: 1,
-    totalPages: 0,
-    totalEstimatedRows: null,        // Estimated count used during initial import
-    processingRows: boolean,         // Flag to indicate background processing; UI remains interactive
-}
+  file: null,
+  layout: null,
+  metrics: undefined,
+  progress: [], // Array of {label, value} for tracking multi-step operations
+  activeStream: null, // Current ReadableStream being processed (null when idle)
+  unexpectedError: null,
+  editingRow: null,
+  removingRow: null,
+  exporting: null,
+  currentRowsFilter: null, // Filter applied to current view
+  currentRows: null, // Current page of rows (lazy-loaded from persistence)
+  currentErrors: null, // Current page of errors (lazy-loaded from persistence)
+  currentPage: 1,
+  totalPages: 0,
+  totalEstimatedRows: null, // Estimated count used during initial import
+  processingRows: boolean, // Flag to indicate background processing; UI remains interactive
+};
 ```
 
 **Key design decisions:**
+
 - `activeStream`: stores the current processing stream; allows states to pipe data through multiple transforms without blocking UI.
 - `processingRows`: boolean flag that indicates background work is ongoing. Users can still navigate pages, edit rows, or trigger exports without waiting for streaming to complete.
 - `progress`: array-based structure for multi-step progress tracking (e.g., "importing: 60%", "validating: null").
@@ -218,62 +232,71 @@ The friendly methods are thin wrappers that call XState `send()` internally, mai
 ### Example (states and stream-based invokes):
 
 ```ts
-this.machine = createMachine(
-    {
-        id: `ETL-${this.id}`,
-        initial: 'initializing',
-        context: DEFAULT_CONTEXT,
-        states: {
-            importing: { 
-                invoke: { 
-                    id: 'import-file', 
-                    src: 'importFile',
-                    input: ({ context }) => ({ file: context.file }),
-                    onDone: {
-                        target: 'mapping',
-                        actions: assign({ activeStream: event.output.stream, totalEstimatedRows: event.output.totalRowsEstimated })
-                    }
-                } 
-            },
-            mapping: { 
-                invoke: { 
-                    id: 'mapping', 
-                    src: 'mapping',
-                    input: ({ context }) => ({ activeStream: context.activeStream, layout: context.layout, totalEstimatedRows: context.totalEstimatedRows })
-                } 
-            },
-            persisting: {
-                invoke: {
-                    id: 'persisting',
-                    src: 'persisting',
-                    input: ({ context }) => ({ activeStream: context.activeStream, totalEstimatedRows: context.totalEstimatedRows }),
-                },
-                on: {
-                    FIRST_CHUNK_RAW_READY: {
-                        target: 'handle-global-steps',  // Transition early while stream is still persisting
-                    }
-                }
-            },
-            'waiting-user': {
-                on: {
-                    CHANGE_PAGE: {
-                        target: 'initializing-user-view',
-                        actions: assign({ currentPage: event.pageNumber })
-                    },
-                    EDIT_ROW: {
-                        target: 'editing-row',
-                        actions: assign({ editingRow: event.rowEdition, processingRows: true })
-                    }
-                }
-            }
-        }
-    }
-)
+this.machine = createMachine({
+  id: `ETL-${this.id}`,
+  initial: "initializing",
+  context: DEFAULT_CONTEXT,
+  states: {
+    importing: {
+      invoke: {
+        id: "import-file",
+        src: "importFile",
+        input: ({ context }) => ({ file: context.file }),
+        onDone: {
+          target: "mapping",
+          actions: assign({
+            activeStream: event.output.stream,
+            totalEstimatedRows: event.output.totalRowsEstimated,
+          }),
+        },
+      },
+    },
+    mapping: {
+      invoke: {
+        id: "mapping",
+        src: "mapping",
+        input: ({ context }) => ({
+          activeStream: context.activeStream,
+          layout: context.layout,
+          totalEstimatedRows: context.totalEstimatedRows,
+        }),
+      },
+    },
+    persisting: {
+      invoke: {
+        id: "persisting",
+        src: "persisting",
+        input: ({ context }) => ({
+          activeStream: context.activeStream,
+          totalEstimatedRows: context.totalEstimatedRows,
+        }),
+      },
+      on: {
+        FIRST_CHUNK_RAW_READY: {
+          target: "handle-global-steps", // Transition early while stream is still persisting
+        },
+      },
+    },
+    "waiting-user": {
+      on: {
+        CHANGE_PAGE: {
+          target: "initializing-user-view",
+          actions: assign({ currentPage: event.pageNumber }),
+        },
+        EDIT_ROW: {
+          target: "editing-row",
+          actions: assign({ editingRow: event.rowEdition, processingRows: true }),
+        },
+      },
+    },
+  },
+});
 ```
 
 ## Extension points (actors)
 
 Actors are the extension points where the Orchestrator calls external module capabilities via the provider. Each actor either:
+
 - **Produces** a stream (importer, local/global step pipes)
 - **Consumes** a stream (mapper, persistence, exporter)
 - **Returns metadata** (metrics, rows for pagination)
@@ -285,34 +308,34 @@ actors: {
         const [stream, totalRowsEstimated] = importer.readFileStream(input.file, signal);
         return { stream, totalRowsEstimated };  // Immediate return; stream processes in background
     }),
-    
+
     mapping: fromPromise(async ({ input, signal }) => {
         const mapper = this.provider.modules.mapper;
         // Mapper pipes activeStream through transformations
         return mapper.handleStream(input.activeStream, input.layout, input.totalEstimatedRows, signal);
     }),
-    
+
     persisting: fromPromise(async ({ input, emit, signal }) => {
         const persistence = this.provider.modules.persistence;
         // Emit FIRST_CHUNK_RAW_READY when first batch is available, allowing early UI transition
         persistence.saveStream(input.activeStream, input.totalEstimatedRows, () => emit({ type: 'FIRST_CHUNK_RAW_READY' }), signal);
     }),
-    
+
     localStepPipe: fromPromise(async ({ input, signal }) => {
         const localStepEngine = this.provider.modules.localStepEngine;
         const persistence = this.provider.modules.persistence;
-        
+
         // Get stream of edited row, apply local steps, return transformed stream for persisting
         const stream = persistence.getRowsStream({ rowIdIn: [input.rowEdition.rowId] });
         const resultStream = await localStepEngine.handleStream(stream, input.layout, 1, signal);
         return resultStream;  // Output: ReadableStream for next state
     }),
-    
+
     globalStepPipe: fromPromise(async ({ input, signal }) => {
         // Process entire dataset through global steps; no return value (fires callback on FIRST_CHUNK_PROCESSED_READY)
         const globalStepEngine = this.provider.modules.globalStepEngine;
         const persistence = this.provider.modules.persistence;
-        
+
         for (const step of input.layout.globalSteps) {
             const stream = persistence.getRowsStream(step.filter.rows);
             const resultStream = globalStepEngine.handleStep(stream, step, null, signal);
@@ -325,32 +348,39 @@ actors: {
 ## Design principles
 
 1. **Stream-based module communication**
-  - Modules communicate via `ReadableStream` pipes, not direct callbacks or events. This decouples module lifecycles and allows background processing without UI freezing.
-  - Each module implements stream-oriented methods (e.g., `readFileStream()`, `handleStream()`, `saveStream()`, `getRowsStream()`).
-  - Streams can be piped through `TransformStream` to add validations, mappings, or filtering without creating intermediate data structures.
+
+- Modules communicate via `ReadableStream` pipes, not direct callbacks or events. This decouples module lifecycles and allows background processing without UI freezing.
+- Each module implements stream-oriented methods (e.g., `readFileStream()`, `handleStream()`, `saveStream()`, `getRowsStream()`).
+- Streams can be piped through `TransformStream` to add validations, mappings, or filtering without creating intermediate data structures.
 
 2. **Non-blocking, reactive architecture**
-  - User interactions (page change, edit, export) are independent of background processing. The `processingRows` flag allows the UI to indicate activity without blocking user actions.
-  - Early transition events (`FIRST_CHUNK_RAW_READY`, `FIRST_CHUNK_PROCESSED_READY`) unblock the state machine, allowing the UI to show data while streams continue processing.
-  - Context updates are published as observables (`context$`, `state$`, `metrics$`, `progress$`), enabling UI components to react in real-time.
+
+- User interactions (page change, edit, export) are independent of background processing. The `processingRows` flag allows the UI to indicate activity without blocking user actions.
+- Early transition events (`FIRST_CHUNK_RAW_READY`, `FIRST_CHUNK_PROCESSED_READY`) unblock the state machine, allowing the UI to show data while streams continue processing.
+- Context updates are published as observables (`context$`, `state$`, `metrics$`, `progress$`), enabling UI components to react in real-time.
 
 3. **Strong central schemas**
-  - Types and schemas in `shared/schemes` are the source of truth. Changes must be versioned and accompanied by migration helpers if incompatible.
+
+- Types and schemas in `shared/schemes` are the source of truth. Changes must be versioned and accompanied by migration helpers if incompatible.
 
 4. **Modularity via interfaces**
-  - Each capability exposes an interface (`i-*.ts`). The Orchestrator consumes those interfaces from `ProviderModule`.
-  - Examples: `IImporter`, `IPersistence`, `IMapper`, `IViewer`, `IExporter`, `ILogger`.
+
+- Each capability exposes an interface (`i-*.ts`). The Orchestrator consumes those interfaces from `ProviderModule`.
+- Examples: `IImporter`, `IPersistence`, `IMapper`, `IViewer`, `IExporter`, `ILogger`.
 
 5. **Edge adapters**
-  - Integrations with external libraries or data sources are implemented as adapters that normalize data to the internal schema before reaching the Orchestrator.
+
+- Integrations with external libraries or data sources are implemented as adapters that normalize data to the internal schema before reaching the Orchestrator.
 
 6. **Observability and recovery**
-  - Orchestrator publishes `state$`, `context$`, `metrics$`, `progress$`. Central logging via `ILoggerModule`.
-  - Errors are stored in `context.unexpectedError` and the machine includes an `error` state with `RESET`.
+
+- Orchestrator publishes `state$`, `context$`, `metrics$`, `progress$`. Central logging via `ILoggerModule`.
+- Errors are stored in `context.unexpectedError` and the machine includes an `error` state with `RESET`.
 
 7. **Cancellation and cleanup**
-  - Invokes use `signal` (AbortSignal) to cancel long-running operations.
-  - `reset()` and `stop()` clean up actors and call `persistence.clear()` when applicable.
+
+- Invokes use `signal` (AbortSignal) to cancel long-running operations.
+- `reset()` and `stop()` clean up actors and call `persistence.clear()` when applicable.
 
 ## Testing and compatibility guarantees
 
@@ -376,28 +406,30 @@ const waitForState = (
 2. **Global validators and transforms: Always chunk**
    - **Never** load all rows into memory for validation/transformation. Always process **chunk-by-chunk** via streams.
    - Implement global validators as `TransformStream` that emit processed chunks:
+
      ```ts
      // Good: chunked validation
      const validationStream = new TransformStream({
        async transform(chunk, controller) {
          const { rows, errors } = chunk;
-         const validated = await validateBatch(rows);  // batch-friendly
+         const validated = await validateBatch(rows); // batch-friendly
          controller.enqueue({ rows: validated, errors });
-       }
+       },
      });
-     
+
      // Bad: loading all rows
-     const allRows = await persistence.getAllRows();  // DON'T DO THIS
-     const validated = allRows.map(row => validate(row));
+     const allRows = await persistence.getAllRows(); // DON'T DO THIS
+     const validated = allRows.map((row) => validate(row));
      ```
+
    - Emit progress updates for long-running global steps:
      ```ts
      const progressStream = new TransformStream({
        async transform(chunk, controller) {
          processedCount += chunk.rows.length;
-         emit({ type: 'PROGRESS_UPDATE', processed: processedCount });
+         emit({ type: "PROGRESS_UPDATE", processed: processedCount });
          controller.enqueue(chunk);
-       }
+       },
      });
      ```
    - Use `AbortSignal` to support cancellation of long-running global validations.
@@ -407,6 +439,8 @@ const waitForState = (
    - **UI adapters**: subscribe to orchestrator observables and expose framework-specific APIs (e.g., React hooks using `useEffect` + `useState`, or Vue `computed` for signals).
    - **Backend adapters**: use orchestrator as a service layer; expose stream data to APIs or message queues.
    - **Example**: replace `persistence-indexdb` with `persistence-postgres` by implementing the same `IPersistence` interface using SQL queries instead of IndexedDB.
+
+- **Guides**: For step-by-step instructions on creating custom modules (templates, examples and interface explanations) see `docs/how-to-create-module.md`.
 
 4. **Observability patterns**
    - Use **observables** (`state$`, `context$`, `metrics$`, `progress$`) for reactive chains and side effects.
@@ -439,7 +473,7 @@ const waitForState = (
          persistence: new PostgresPersistence(),
          exporter: new S3Exporter(),
          // ... other modules
-       }
+       },
      });
      orchestrator.initialize(provider);
      ```
@@ -462,7 +496,7 @@ const waitForState = (
 ```
 UI: Select Layout & File
     ↓
-LAYOUT_SELECTED → waiting-layout → LAYOUT_SELECTED 
+LAYOUT_SELECTED → waiting-layout → LAYOUT_SELECTED
 FILE_SELECTED → waiting-file → FILE_SELECTED
     ↓ (processingRows = true)
 importing (activeStream = readFileStream)
@@ -524,12 +558,14 @@ ETL CoreStream is a **headless orchestration library** designed for maximum port
 ### Core vs. Adapters
 
 **Core (`src/core/orchestator` + base modules):**
+
 - XState machine coordinating state transitions and stream pipelines.
 - Base interfaces (`i-*.ts`) defining module contracts.
 - Observable/signal-based context sharing.
 - No UI framework dependencies; no platform assumptions (browser-only, Node-only, etc.).
 
 **Adapters (external or in `src/adapters/`):**
+
 - **UI adapters**: Convert observables to framework-specific patterns (React hooks, Vue composables, Svelte stores).
 - **Persistence adapters**: Connect to IndexedDB, SQLite, PostgreSQL, cloud storage, etc.
 - **Importer adapters**: Support file formats (CSV, Excel, JSON), APIs, databases, message queues.
@@ -548,10 +584,19 @@ export function useOrchestrator(orchestrator: OrchestatorModule) {
     const sub1 = orchestrator.state$.subscribe(setState);
     const sub2 = orchestrator.context$.subscribe(setContext);
     const sub3 = orchestrator.metrics$.subscribe(setMetrics);
-    return () => { sub1.unsubscribe(); sub2.unsubscribe(); sub3.unsubscribe(); };
+    return () => {
+      sub1.unsubscribe();
+      sub2.unsubscribe();
+      sub3.unsubscribe();
+    };
   }, [orchestrator]);
 
-  return { state, context, metrics, actions: { selectLayout, selectFile, editRow, export: export_ } };
+  return {
+    state,
+    context,
+    metrics,
+    actions: { selectLayout, selectFile, editRow, export: export_ },
+  };
 }
 ```
 
@@ -560,7 +605,12 @@ export function useOrchestrator(orchestrator: OrchestatorModule) {
 ```ts
 // adapters/persistence-postgres/main.ts
 export class PostgresPersistence implements IPersistence {
-  async saveStream(stream: ReadableStream, estimatedRows: number | null, onFirstChunk: () => void, signal: AbortSignal): Promise<void> {
+  async saveStream(
+    stream: ReadableStream,
+    estimatedRows: number | null,
+    onFirstChunk: () => void,
+    signal: AbortSignal
+  ): Promise<void> {
     // Pipe stream to batch INSERT queries; emit onFirstChunk when first batch is persisted
   }
 
@@ -576,14 +626,14 @@ export class PostgresPersistence implements IPersistence {
 
 ### Benefits of Headless + Adapter Design
 
-| Benefit | How It Works |
-|---------|-------------|
-| **Multi-platform** | Same core logic runs in browser, Node.js, Deno, edge workers. |
-| **Framework-agnostic** | UI adapters bridge orchestrator to any frontend framework. |
-| **Storage flexibility** | Swap persistence without changing orchestrator or UI. |
-| **Testing simplicity** | Mock adapters for unit tests; compose real adapters for integration tests. |
-| **Scalability** | Run orchestrator on server; stream data to lightweight browser UI via WebSocket. |
-| **Performance** | Each adapter optimizes for its context (browser memory, server throughput, etc.). |
+| Benefit                 | How It Works                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| **Multi-platform**      | Same core logic runs in browser, Node.js, Deno, edge workers.                     |
+| **Framework-agnostic**  | UI adapters bridge orchestrator to any frontend framework.                        |
+| **Storage flexibility** | Swap persistence without changing orchestrator or UI.                             |
+| **Testing simplicity**  | Mock adapters for unit tests; compose real adapters for integration tests.        |
+| **Scalability**         | Run orchestrator on server; stream data to lightweight browser UI via WebSocket.  |
+| **Performance**         | Each adapter optimizes for its context (browser memory, server throughput, etc.). |
 
 ## Conclusion
 

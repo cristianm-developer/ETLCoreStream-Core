@@ -34,13 +34,13 @@ const DEFAULT_CONTEXT: OrchestatorContext = {
 };
 
 export class OrchestratorModule implements IOrchestratorModule {
-  private id: string;
+  private id!: string;
 
   private actor: ActorRefFrom<ReturnType<typeof createMachine>> | undefined;
   private machine: ReturnType<typeof createMachine> | undefined;
 
-  private provider: ProviderModule;
-  private logger: ILoggerModule;
+  private provider!: ProviderModule;
+  private logger!: ILoggerModule;
 
   private stateSubject: BehaviorSubject<OrchestatorStateType> =
     new BehaviorSubject<OrchestatorStateType>("initializing");
@@ -61,20 +61,20 @@ export class OrchestratorModule implements IOrchestratorModule {
   get state() {
     return this.stateSignal.value;
   }
-  state$: Observable<OrchestatorStateType>;
+  state$!: Observable<OrchestatorStateType>;
   public metricsSignal: Signal<OrchestatorContext["metrics"]> = signal<
     OrchestatorContext["metrics"]
   >(DEFAULT_CONTEXT.metrics);
   get metrics() {
     return this.metricsSignal?.value;
   }
-  metrics$: Observable<OrchestatorContext["metrics"]>;
+  metrics$!: Observable<OrchestatorContext["metrics"]>;
 
-  context$: Observable<OrchestatorContext>;
-  logs$: Observable<Log>;
+  context$!: Observable<OrchestatorContext>;
+  logs$!: Observable<Log>;
 
-  setLayout: (layout: LayoutBase) => void;
-  getLayout: () => LayoutBase | null;
+  setLayout!: (layout: LayoutBase) => void;
+  getLayout!: () => LayoutBase | null;
 
   getId = (): string => this.id;
   getCurrentState = (): string => {
@@ -194,7 +194,9 @@ export class OrchestratorModule implements IOrchestratorModule {
               },
               onError: {
                 target: "error",
-                actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                actions: assign(({ event }) => ({
+                  unexpectedError: (event.error as Error).toString(),
+                })),
               },
             },
           },
@@ -215,7 +217,9 @@ export class OrchestratorModule implements IOrchestratorModule {
               },
               onError: {
                 target: "error",
-                actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                actions: assign(({ event }) => ({
+                  unexpectedError: (event.error as Error).toString(),
+                })),
               },
             },
           },
@@ -236,7 +240,9 @@ export class OrchestratorModule implements IOrchestratorModule {
               },
               onError: {
                 target: "error",
-                actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                actions: assign(({ event }) => ({
+                  unexpectedError: (event.error as Error).toString(),
+                })),
               },
             },
           },
@@ -253,7 +259,9 @@ export class OrchestratorModule implements IOrchestratorModule {
               }),
               onError: {
                 target: "error",
-                actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                actions: assign(({ event }) => ({
+                  unexpectedError: (event.error as Error).toString(),
+                })),
               },
             },
             on: {
@@ -280,7 +288,9 @@ export class OrchestratorModule implements IOrchestratorModule {
               ],
               onError: {
                 target: "error",
-                actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                actions: assign(({ event }) => ({
+                  unexpectedError: (event.error as Error).toString(),
+                })),
               },
             },
             on: {
@@ -521,7 +531,9 @@ export class OrchestratorModule implements IOrchestratorModule {
               },
               onError: {
                 target: "error",
-                actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                actions: assign(({ event }) => ({
+                  unexpectedError: (event.error as Error).toString(),
+                })),
               },
             },
             exit: assign({ removingRow: () => null }),
@@ -538,7 +550,9 @@ export class OrchestratorModule implements IOrchestratorModule {
               },
               onError: {
                 target: "error",
-                actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                actions: assign(({ event }) => ({
+                  unexpectedError: (event.error as Error).toString(),
+                })),
               },
             },
             exit: assign({ exporting: () => null }),
@@ -775,7 +789,9 @@ export class OrchestratorModule implements IOrchestratorModule {
       this.stateSubject.next(value as OrchestatorStateType);
       this.contextSubject.next(context as OrchestatorContext);
       this.metricsSubject.next(context.metrics);
-      this.progressSubject.next(context.progress.filter((e) => e.value !== null));
+      this.progressSubject.next(
+        context.progress.filter((e: { label: string; value: number | null }) => e.value !== null)
+      );
 
       this.stateSignal.value = value as OrchestatorStateType;
       this.metricsSignal.value = context.metrics;

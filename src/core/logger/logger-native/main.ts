@@ -1,71 +1,90 @@
-import { Log } from "../../../shared/schemes/log";
-import { Observable, Subject } from 'rxjs';
-import { ILoggerModule, LoggerModuleOptions, StatusLog } from "../i-logger-module";
+import type { Log } from "../../../shared/schemes/log";
+import type { Observable } from "rxjs";
+import { Subject } from "rxjs";
+import type { ILoggerModule, LoggerModuleOptions, StatusLog } from "../i-logger-module";
 
 export type { StatusLog };
 
 export class LoggerModule implements ILoggerModule {
-    public id: 'logger';
-    
-    private logs:Log[] = [];
-    private config: LoggerModuleOptions;
-    private logSubject = new Subject<Log>();
-    
-    readonly logs$:Observable<Log> = this.logSubject.asObservable();
+  public id = "logger" as const;
 
-    private statusLog: {order: number, progress: number, status: 'idle' | 'running' | 'completed' | 'error' | 'paused' | 'waiting', step: string}[] = [];
-        
-    private statusSubject = new Subject<{order: number, progress: number, status: 'idle' | 'running' | 'completed' | 'error' | 'paused' | 'waiting', step: string}>();
-    readonly status$:Observable<{order: number, progress: number, status: 'idle' | 'running' | 'completed' | 'error' | 'paused' | 'waiting', step: string}> = this.statusSubject.asObservable();    
+  private logs: Log[] = [];
+  private config: LoggerModuleOptions;
+  private logSubject = new Subject<Log>();
 
+  readonly logs$: Observable<Log> = this.logSubject.asObservable();
 
-    getStatusLog = (order:number) => this.statusLog.find(status => status.order === order);
+  private statusLog: {
+    order: number;
+    progress: number;
+    status: "idle" | "running" | "completed" | "error" | "paused" | "waiting";
+    step: string;
+  }[] = [];
 
-    updateStatus: (status: {order: number, progress: number, status: 'idle' | 'running' | 'completed' | 'error' | 'paused' | 'waiting', step: string}) => void = (status) => {
-        this.statusLog.push(status);
-        this.statusSubject.next(status);
-    };
+  private statusSubject = new Subject<{
+    order: number;
+    progress: number;
+    status: "idle" | "running" | "completed" | "error" | "paused" | "waiting";
+    step: string;
+  }>();
+  readonly status$: Observable<{
+    order: number;
+    progress: number;
+    status: "idle" | "running" | "completed" | "error" | "paused" | "waiting";
+    step: string;
+  }> = this.statusSubject.asObservable();
 
-    log: (
-        message: string,
-        level: 'info' | 'warn' | 'error' | 'debug' | 'success',
-        step: string,
-        id: string
-    ) => void = (message, level, step) => {
-        this.logs.push({ timestamp: new Date(), id: this.id, message, level, step });
-        this.logSubject.next({ timestamp: new Date(), id: this.id, message, level, step });
-    };
+  getStatusLog = (order: number) => this.statusLog.find((status) => status.order === order);
 
-    getLogs: (
-        fromTime?: Date,
-        toTime?: Date,
-        fromIndex?: number,
-        toIndex?: number,
-        level?: 'info' | 'warn' | 'error' | 'debug' | 'success',
-        step?: string,
-        id?: string
-    ) => Log[] = (fromTime, toTime, fromIndex, toIndex, level, step, id) => {
-        fromIndex ??= 0;
-        toIndex ??= this.logs.length - 1;
+  updateStatus: (status: {
+    order: number;
+    progress: number;
+    status: "idle" | "running" | "completed" | "error" | "paused" | "waiting";
+    step: string;
+  }) => void = (status) => {
+    this.statusLog.push(status);
+    this.statusSubject.next(status);
+  };
 
-        const slicedLogs = this.logs.slice(fromIndex, toIndex + 1);
+  log: (
+    message: string,
+    level: "info" | "warn" | "error" | "debug" | "success",
+    step: string,
+    id: string
+  ) => void = (message, level, step) => {
+    this.logs.push({ timestamp: new Date(), id: this.id, message, level, step });
+    this.logSubject.next({ timestamp: new Date(), id: this.id, message, level, step });
+  };
 
-        return slicedLogs.filter(log => {
-            const matchesTime = (fromTime && toTime)
-                ? (log.timestamp >= fromTime && log.timestamp <= toTime)
-                : true;
+  getLogs: (
+    fromTime?: Date,
+    toTime?: Date,
+    fromIndex?: number,
+    toIndex?: number,
+    level?: "info" | "warn" | "error" | "debug" | "success",
+    step?: string,
+    id?: string
+  ) => Log[] = (fromTime, toTime, fromIndex, toIndex, level, step, id) => {
+    fromIndex ??= 0;
+    toIndex ??= this.logs.length - 1;
 
-            const matchesLevel = level ? log.level === level : true;
-            const matchesStep = step ? log.step === step : true;
-            const matchesId = id ? log.id === id : true;
+    const slicedLogs = this.logs.slice(fromIndex, toIndex + 1);
 
-            return matchesTime && matchesLevel && matchesStep && matchesId;
-        });
-    }
+    return slicedLogs.filter((log) => {
+      const matchesTime =
+        fromTime && toTime ? log.timestamp >= fromTime && log.timestamp <= toTime : true;
 
-    restartLogs: () => void = () => this.logs = [];
+      const matchesLevel = level ? log.level === level : true;
+      const matchesStep = step ? log.step === step : true;
+      const matchesId = id ? log.id === id : true;
 
-    constructor(config: LoggerModuleOptions) {
-        this.config = config;
-    }
+      return matchesTime && matchesLevel && matchesStep && matchesId;
+    });
+  };
+
+  restartLogs: () => void = () => (this.logs = []);
+
+  constructor(config: LoggerModuleOptions = {}) {
+    this.config = config;
+  }
 }

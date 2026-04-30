@@ -7,13 +7,6 @@ import eslint from "vite-plugin-eslint";
 export default defineConfig({
   plugins: [
     dts({
-      tsconfigPath: "./tsconfig.json",
-      rollupTypes: false,
-      insertTypesEntry: false,
-      include: ["src/**/*.ts"],
-      skipDiagnostics: true,
-      outDir: "dist",
-      entryRoot: "src",
     }),
     eslint(),
   ],

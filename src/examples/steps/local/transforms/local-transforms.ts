@@ -1,12 +1,12 @@
-import { LocalStepTransform } from '@/shared/schemes/local-step-transforms';
+import type { LocalStepTransform } from "@/shared/schemes/local-step-transforms";
 
 /**
  * Elimina espacios en blanco al inicio y final del valor
  */
 export const trim = (headerKey: string): LocalStepTransform => ({
   headerKey,
-  name: 'trim',
-  fn: (value: string, _row: any, ...args: any[]) => value.trim(),
+  name: "trim",
+  fn: (value: string, _row: any, ..._args: any[]) => value.trim(),
 });
 
 /**
@@ -17,7 +17,7 @@ export const diccTransform = (
   dict: Record<string, string>
 ): LocalStepTransform => ({
   headerKey,
-  name: 'diccTransform',
+  name: "diccTransform",
   fn: (value: string, _row: any, ...args: any[]) => {
     const mappingDict: Record<string, string> = args[0] ?? {};
     return mappingDict[value] ?? value;
@@ -30,8 +30,8 @@ export const diccTransform = (
  */
 export const extractDigits = (headerKey: string): LocalStepTransform => ({
   headerKey,
-  name: 'extractDigits',
-  fn: (value: string, _row: any, ...args: any[]) => value.replace(/\D/g, ''),
+  name: "extractDigits",
+  fn: (value: string, _row: any, ..._args: any[]) => value.replace(/\D/g, ""),
 });
 
 /**
@@ -39,8 +39,8 @@ export const extractDigits = (headerKey: string): LocalStepTransform => ({
  */
 export const clear = (headerKey: string): LocalStepTransform => ({
   headerKey,
-  name: 'clear',
-  fn: (value: string, _row: any, ...args: any[]) => '',
+  name: "clear",
+  fn: (_value: string, _row: any, ..._args: any[]) => "",
 });
 
 /**
@@ -51,10 +51,10 @@ export const boolResult = (
   predicate: (value: string, row?: any) => boolean
 ): LocalStepTransform => ({
   headerKey,
-  name: 'boolResult',
+  name: "boolResult",
   fn: (value: string, row: any, ...args: any[]) => {
     const pred: (value: string, row?: any) => boolean = args[0] ?? (() => false);
-    return pred(value, row) ? 'true' : 'false';
+    return pred(value, row) ? "true" : "false";
   },
   args: [predicate],
 });

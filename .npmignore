@@ -1,0 +1,32 @@
+# Source files (compiled to dist/)
+src/
+
+# Test files
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+vitest*.config.ts
+
+# Development files
+.vscode/
+.git/
+.gitignore
+.env
+.env.local
+
+# Build & tooling config
+vite.config.ts
+tsconfig.json
+
+# Documentation
+*.md
+docs/
+
+# Dependencies
+node_modules/
+
+# Other
+.cursor/
+.DS_Store
+*.log

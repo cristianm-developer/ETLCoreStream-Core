@@ -1,5 +1,5 @@
-import { RowObject } from '@/shared/schemes/row-object';
-import { ReadableStream } from 'stream/web';
+import type { RowObject } from "@/shared/schemes/row-object";
+import type { ReadableStream } from "stream/web";
 
 /**
  * Exports only name and email from the record
@@ -10,8 +10,8 @@ export const ExportJustNameAndEmail = {
     email: row.value.email,
   }),
   labelDicc: {
-    name: 'Nombre Completo',
-    email: 'Correo Electrónico',
+    name: "Nombre Completo",
+    email: "Correo Electrónico",
   },
 };
 
@@ -20,18 +20,18 @@ export const ExportJustNameAndEmail = {
  */
 export const ExportFullContact = {
   fn: (row: RowObject) => ({
-    name: row.value.name?.trim() || 'N/A',
-    email: row.value.email?.toLowerCase() || 'N/A',
-    phone: row.value.phone || 'Sin teléfono',
-    country: row.value.country?.toUpperCase() || 'UNKNOWN',
-    status: row.value.active ? 'Activo' : 'Inactivo',
+    name: row.value.name?.trim() || "N/A",
+    email: row.value.email?.toLowerCase() || "N/A",
+    phone: row.value.phone || "Sin teléfono",
+    country: row.value.country?.toUpperCase() || "UNKNOWN",
+    status: row.value.active ? "Activo" : "Inactivo",
   }),
   labelDicc: {
-    name: 'Nombre',
-    email: 'Email',
-    phone: 'Teléfono',
-    country: 'País',
-    status: 'Estado',
+    name: "Nombre",
+    email: "Email",
+    phone: "Teléfono",
+    country: "País",
+    status: "Estado",
   },
 };
 
@@ -50,8 +50,8 @@ export const ExportValidEmailsOnly = {
     };
   },
   labelDicc: {
-    name: 'Contacto',
-    email: 'Dirección de Email',
+    name: "Contacto",
+    email: "Dirección de Email",
   },
 };
 
@@ -60,19 +60,19 @@ export const ExportValidEmailsOnly = {
  */
 export const ExportGroupedByCountry = {
   fn: (row: RowObject) => ({
-    country: row.value.country || 'Unknown',
+    country: row.value.country || "Unknown",
     name: row.value.name,
     email: row.value.email,
   }),
   labelDicc: {
-    country: 'País',
-    name: 'Nombre del Contacto',
-    email: 'Email',
+    country: "País",
+    name: "Nombre del Contacto",
+    email: "Email",
   },
   callback: async (stream: ReadableStream<any>) => {
     const reader = stream.getReader();
     const decoder = new TextDecoder();
-    
+
     // Group records by country
     const countryCounts: Record<string, number> = {};
     const countryContacts: Record<string, string[]> = {};
@@ -84,8 +84,8 @@ export const ExportGroupedByCountry = {
         if (done) break;
 
         const data = JSON.parse(decoder.decode(value));
-        const country = data.country || 'Unknown';
-        
+        const country = data.country || "Unknown";
+
         countryCounts[country] = (countryCounts[country] || 0) + 1;
         if (!countryContacts[country]) {
           countryContacts[country] = [];
@@ -94,17 +94,19 @@ export const ExportGroupedByCountry = {
         processedRows++;
       }
 
-      console.log('\n=== EXPORT SUMMARY ===');
+      console.log("\n=== EXPORT SUMMARY ===");
       console.log(`Total records processed: ${processedRows}\n`);
-      
+
       Object.entries(countryCounts)
         .sort((a, b) => b[1] - a[1])
         .forEach(([country, count]) => {
           console.log(`${country}: ${count} contacts`);
-          console.log(`  Emails: ${countryContacts[country]?.slice(0, 3).join(', ')}${count > 3 ? '...' : ''}`);
+          console.log(
+            `  Emails: ${countryContacts[country]?.slice(0, 3).join(", ")}${count > 3 ? "..." : ""}`
+          );
         });
-        
-      console.log('=====================\n');
+
+      console.log("=====================\n");
     } finally {
       reader.releaseLock();
     }
@@ -116,18 +118,18 @@ export const ExportGroupedByCountry = {
  */
 export const ExportForCSV = {
   fn: (row: RowObject) => ({
-    first_name: row.value.name?.split(' ')[0] || '',
-    last_name: row.value.name?.split(' ').slice(1).join(' ') || '',
+    first_name: row.value.name?.split(" ")[0] || "",
+    last_name: row.value.name?.split(" ").slice(1).join(" ") || "",
     email_address: row.value.email,
-    phone_number: row.value.phone?.replace(/\D/g, '') || '',
-    country_code: row.value.country?.substring(0, 2).toUpperCase() || '',
+    phone_number: row.value.phone?.replace(/\D/g, "") || "",
+    country_code: row.value.country?.substring(0, 2).toUpperCase() || "",
   }),
   labelDicc: {
-    first_name: 'First Name',
-    last_name: 'Last Name',
-    email_address: 'Email Address',
-    phone_number: 'Phone Number',
-    country_code: 'Country Code',
+    first_name: "First Name",
+    last_name: "Last Name",
+    email_address: "Email Address",
+    phone_number: "Phone Number",
+    country_code: "Country Code",
   },
 };
 
@@ -144,17 +146,17 @@ export const ExportWithValidation = {
     rowId: row.__rowId,
   }),
   labelDicc: {
-    name: 'Nombre',
-    email: 'Email',
-    phone: 'Teléfono',
-    country: 'País',
-    hasError: 'Tiene Error',
-    rowId: 'ID Registro',
+    name: "Nombre",
+    email: "Email",
+    phone: "Teléfono",
+    country: "País",
+    hasError: "Tiene Error",
+    rowId: "ID Registro",
   },
   callback: async (stream: ReadableStream<any>) => {
     const reader = stream.getReader();
     const decoder = new TextDecoder();
-    
+
     const stats = {
       total: 0,
       valid: 0,
@@ -170,7 +172,7 @@ export const ExportWithValidation = {
 
         const data = JSON.parse(decoder.decode(value));
         stats.total++;
-        
+
         if (data.hasError) {
           stats.invalid++;
           stats.rowsWithErrors.push(data.rowId);
@@ -182,19 +184,21 @@ export const ExportWithValidation = {
         }
       }
 
-      console.log('\n=== EXPORT STATISTICS ===');
+      console.log("\n=== EXPORT STATISTICS ===");
       console.log(`Total: ${stats.total}`);
       console.log(`Valid: ${stats.valid} (${((stats.valid / stats.total) * 100).toFixed(1)}%)`);
-      console.log(`With errors: ${stats.invalid} (${((stats.invalid / stats.total) * 100).toFixed(1)}%)`);
-      
+      console.log(
+        `With errors: ${stats.invalid} (${((stats.invalid / stats.total) * 100).toFixed(1)}%)`
+      );
+
       if (stats.rowsWithErrors.length > 0) {
-        console.log(`\nRecords with errors: ${stats.rowsWithErrors.join(', ')}`);
+        console.log(`\nRecords with errors: ${stats.rowsWithErrors.join(", ")}`);
       }
-      
+
       if (stats.emailsProcessed.length > 0) {
-        console.log(`\nFirst emails processed:\n  - ${stats.emailsProcessed.join('\n  - ')}`);
+        console.log(`\nFirst emails processed:\n  - ${stats.emailsProcessed.join("\n  - ")}`);
       }
-      console.log('========================\n');
+      console.log("========================\n");
     } finally {
       reader.releaseLock();
     }

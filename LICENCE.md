@@ -25,16 +25,19 @@ SOFTWARE.
 ## What this means
 
 **You can:**
+
 - Use this library in any project (open source or commercial)
 - Modify and fork the code
 - Distribute the library
 - Use it privately
 
 **You must:**
+
 - Include the original license notice and copyright statement
 - Give credit to the original ETL CoreStream repository
 
 **You cannot:**
+
 - Hold the authors liable for any issues or damages
 - Remove the copyright/license notice
 
@@ -43,4 +46,3 @@ SOFTWARE.
 ## Contributing
 
 Found a bug or have a feature idea? Please open an issue or submit a pull request! We'd love your contributions.
-
