@@ -9,10 +9,11 @@ Esta guía documenta los ajustes realizados para resolver el problema de generac
 Al ejecutar `npm run build`, el archivo `dist/index.d.ts` se generaba vacío:
 
 ```typescript
-export { }
+export {};
 ```
 
 Esto ocurría principalmente por:
+
 1. **Configuración de `vite-plugin-dts` incompleta**: Faltaban propiedades críticas
 2. **Rutas de alias mal configuradas**: El tsconfig no resolvía correctamente las importaciones
 3. **`rollupTypes: true` causaba colapso**: Al combinar todos los tipos, los errores los colapsaban a un export vacío
@@ -22,6 +23,7 @@ Esto ocurría principalmente por:
 ### 1. Ajuste en `tsconfig.json`
 
 **Cambios**:
+
 - Cambiar `include` de `["src/**/*", "examples"]` a `["src/**/*.ts"]` para incluir solo archivos TypeScript
 - Mantener la configuración de `baseUrl` y `paths` correcta
 
@@ -52,17 +54,18 @@ Esto ocurría principalmente por:
 
 ```typescript
 dts({
-  tsconfigPath: "./tsconfig.json",        // Fuerza uso del tsconfig del proyecto
-  rollupTypes: false,                      // NO combina todos los tipos en uno
-  insertTypesEntry: false,                 // Manejamos el index.d.ts con post-build
-  include: ["src/**/*.ts"],                // Procesa solo archivos TS
-  skipDiagnostics: true,                   // Continúa aunque haya errores de tipo en tests
-  outDir: "dist",                          // Output en dist
-  entryRoot: "src",                        // Raíz de entrada
-})
+  tsconfigPath: "./tsconfig.json", // Fuerza uso del tsconfig del proyecto
+  rollupTypes: false, // NO combina todos los tipos en uno
+  insertTypesEntry: false, // Manejamos el index.d.ts con post-build
+  include: ["src/**/*.ts"], // Procesa solo archivos TS
+  skipDiagnostics: true, // Continúa aunque haya errores de tipo en tests
+  outDir: "dist", // Output en dist
+  entryRoot: "src", // Raíz de entrada
+});
 ```
 
 **Por qué funciona**:
+
 - `rollupTypes: false` genera un archivo `.d.ts` para cada `.ts`, permitiendo que los tipos se resuelvan correctamente
 - `skipDiagnostics: true` permite que la build continúe a pesar de errores en tests (no son parte de la API pública)
 - Las rutas de alias se resuelven correctamente
@@ -72,28 +75,28 @@ dts({
 **Archivo**: `scripts/post-build.js`
 
 ```javascript
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const distDir = path.join(__dirname, '..', 'dist');
-const srcIndexDts = path.join(distDir, 'src', 'index.d.ts');
-const distIndexDts = path.join(distDir, 'index.d.ts');
+const distDir = path.join(__dirname, "..", "dist");
+const srcIndexDts = path.join(distDir, "src", "index.d.ts");
+const distIndexDts = path.join(distDir, "index.d.ts");
 
 try {
-  let content = fs.readFileSync(srcIndexDts, 'utf-8');
-  
+  let content = fs.readFileSync(srcIndexDts, "utf-8");
+
   // Ajusta las rutas para que apunten a src/
   content = content
     .replace(/export \* from '\.\/core\/index'/g, "export * from './src/core/index'")
     .replace(/export \* from '\.\/shared\/index'/g, "export * from './src/shared/index'")
     .replace(/export \* from '\.\/examples\/index'/g, "export * from './src/examples/index'");
-  
-  fs.writeFileSync(distIndexDts, content, 'utf-8');
-  console.log('✓ Successfully created dist/index.d.ts');
+
+  fs.writeFileSync(distIndexDts, content, "utf-8");
+  console.log("✓ Successfully created dist/index.d.ts");
 } catch (error) {
-  console.error('✗ Error creating dist/index.d.ts:', error.message);
+  console.error("✗ Error creating dist/index.d.ts:", error.message);
   process.exit(1);
 }
 ```
@@ -103,6 +106,7 @@ try {
 ### 4. Actualización de `package.json`
 
 **Cambio en script de build**:
+
 ```json
 "build": "vite build && node scripts/post-build.js"
 ```
@@ -160,11 +164,13 @@ cat dist/index.d.ts
 ## Errores Conocidos que se Ignoran
 
 Durante la build aparecen errores de TypeScript en:
+
 - `src/core/orchestrator/main.ts` - Manejo de errores `unknown`
 - `src/core/steps-engine/` - Tests con tipos no completamente tipados
 - `src/core/viewer/` - Variables implícitas en tests
 
 Estos NO afectan la API pública porque:
+
 1. Son principalmente en archivos de test (`.test.ts`)
 2. No son exportados en el `index.ts`
 3. `skipDiagnostics: true` los ignora en la generación de tipos

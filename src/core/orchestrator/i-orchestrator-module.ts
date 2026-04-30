@@ -10,7 +10,7 @@ export interface IOrchestratorModule {
   initialize(provider: ProviderModule, id?: string): void;
 
   /* layout management */
-  getLayout: () => LayoutBase | null;  
+  getLayout: () => LayoutBase | null;
 
   /* identity / state / context */
   getId(): string;

@@ -9,17 +9,14 @@ export default defineConfig({
     dts({
       include: ["src"],
       insertTypesEntry: true,
-      exclude: [
-        "src/**/*.test.ts",
-        "src/setupTests.ts",
-      ],
+      exclude: ["src/**/*.test.ts", "src/setupTests.ts"],
       entryRoot: "src",
       cleanVueFileName: true,
       staticImport: true,
       compilerOptions: {
         declarationDir: "dist",
         baseUrl: ".",
-      }
+      },
     }),
     eslint(),
   ],

@@ -518,22 +518,27 @@ Real-time reactive updates via RxJS and Preact Signals for state, context, metri
 ETL CoreStream is **environment-agnostic**. Build custom modules to deploy anywhere:
 
 **Browser**
+
 - Implement IndexedDB persistence, file API importers, API exporters
 - Instant import and export with real-time editing
 
 **Node.js / Deno**
+
 - Implement file system persistence, database adapters, scheduled pipelines
 - SQLite, PostgreSQL, or cloud database integration
 
 **Edge Workers**
+
 - Implement Cloudflare Workers, AWS Lambda exporters
 - Stream data to cloud storage with real-time transformations
 
 **Docker / Kubernetes**
+
 - Implement containerized modules with minimal resource overhead
 - Scales horizontally via service architecture
 
 **Microservices**
+
 - Implement as a service module exposing REST/GraphQL APIs
 - Connect to message queues via custom exporters
 

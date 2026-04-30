@@ -787,51 +787,62 @@ export class OrchestratorModule implements IOrchestratorModule {
 
     const snapshot$ = from(this.actor);
 
-    this.subscriptions.add(snapshot$.pipe(
-      map(s => s.value as OrchestratorStateType),
-      distinctUntilChanged()
-    ).subscribe(val => {
-      this.stateSubject.next(val as OrchestratorStateType);
-      this.stateSignal.value = val as OrchestratorStateType;
-    }));
-
     this.subscriptions.add(
-      snapshot$.pipe(
-        map(s => s.context.metrics as OrchestratorContext["metrics"]),
-        distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
-      ).subscribe(val => {
-        this.metricsSubject.next(val);
-        this.metricsSignal.value = val;
-      })
+      snapshot$
+        .pipe(
+          map((s) => s.value as OrchestratorStateType),
+          distinctUntilChanged()
+        )
+        .subscribe((val) => {
+          this.stateSubject.next(val as OrchestratorStateType);
+          this.stateSignal.value = val as OrchestratorStateType;
+        })
     );
 
     this.subscriptions.add(
-      snapshot$.pipe(
-        map(s => s.context.progress.filter((e: any) => e.value !== null)),
-        distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
-      ).subscribe(val => {
-        this.progressSubject.next(val);
-      })
+      snapshot$
+        .pipe(
+          map((s) => s.context.metrics as OrchestratorContext["metrics"]),
+          distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
+        )
+        .subscribe((val) => {
+          this.metricsSubject.next(val);
+          this.metricsSignal.value = val;
+        })
     );
 
     this.subscriptions.add(
-      snapshot$.pipe(
-        map(s => s.context.file ?? null),
-        distinctUntilChanged((prev, curr) => prev?.name === curr?.name)
-      ).subscribe(val => {
-        this.fileSubject.next(val);
-      })
+      snapshot$
+        .pipe(
+          map((s) => s.context.progress.filter((e: any) => e.value !== null)),
+          distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
+        )
+        .subscribe((val) => {
+          this.progressSubject.next(val);
+        })
     );
 
     this.subscriptions.add(
-      snapshot$.pipe(
-        map(s => s.context as OrchestratorContext),
-        distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
-      ).subscribe(val => {
-        this.contextSubject.next(val);
-      })
-    )
-    
+      snapshot$
+        .pipe(
+          map((s) => s.context.file ?? null),
+          distinctUntilChanged((prev, curr) => prev?.name === curr?.name)
+        )
+        .subscribe((val) => {
+          this.fileSubject.next(val);
+        })
+    );
+
+    this.subscriptions.add(
+      snapshot$
+        .pipe(
+          map((s) => s.context as OrchestratorContext),
+          distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
+        )
+        .subscribe((val) => {
+          this.contextSubject.next(val);
+        })
+    );
 
     this.actor.start();
   };

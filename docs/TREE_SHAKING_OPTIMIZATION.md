@@ -15,6 +15,7 @@ Esta guía documenta los ajustes realizados para optimizar el tree shaking y la 
 ### 1. Desactivar Minificación (`minify: false`)
 
 **Antes**:
+
 ```typescript
 build: {
   minify: "terser",
@@ -26,6 +27,7 @@ build: {
 ```
 
 **Después**:
+
 ```typescript
 build: {
   minify: false,
@@ -33,6 +35,7 @@ build: {
 ```
 
 **Por qué funciona**:
+
 - Los bundlers del usuario (webpack, Vite, esbuild, swc) pueden minificar de forma más agresiva
 - El código generado es más legible para debugging y auditoría
 - Mejor compatibilidad con herramientas que analizan el código
@@ -41,6 +44,7 @@ build: {
 ### 2. Exportaciones Nombradas en rollupOptions
 
 **Nuevo**:
+
 ```typescript
 rollupOptions: {
   external: [...],
@@ -51,6 +55,7 @@ rollupOptions: {
 ```
 
 **Por qué funciona**:
+
 - Las exportaciones nombradas son más eficientes para tree shaking
 - Los bundlers pueden eliminar fácilmente las que no se usan
 - Default exports son históricamente más difíciles de optimizar
@@ -58,23 +63,25 @@ rollupOptions: {
 ### 3. Orden Correcto en package.json
 
 **Campos configurados correctamente**:
+
 ```json
 {
-  "main": "./dist/index.cjs",              // CommonJS (Node.js tradicional)
-  "module": "./dist/index.mjs",            // ES Module (herramientas modernas)
-  "types": "./dist/index.d.ts",            // TypeScript types
+  "main": "./dist/index.cjs", // CommonJS (Node.js tradicional)
+  "module": "./dist/index.mjs", // ES Module (herramientas modernas)
+  "types": "./dist/index.d.ts", // TypeScript types
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",        // Types primero (mejor soporte IDE)
-      "import": "./dist/index.mjs",        // ES Module import
-      "require": "./dist/index.cjs"        // CommonJS require
+      "types": "./dist/index.d.ts", // Types primero (mejor soporte IDE)
+      "import": "./dist/index.mjs", // ES Module import
+      "require": "./dist/index.cjs" // CommonJS require
     }
   },
-  "sideEffects": false                     // Habilita tree shaking agresivo
+  "sideEffects": false // Habilita tree shaking agresivo
 }
 ```
 
 **Por qué funciona**:
+
 - `main`, `module`, `types`: Especifican qué archivo usar según el contexto
 - `exports` con `types` primero: Mejor resolución en IDEs y bundlers
 - `sideEffects: false`: **Indica al bundler que NO hay código que se ejecuta con solo importar**
@@ -82,6 +89,7 @@ rollupOptions: {
 ### 4. Verificación de Exportaciones Nombradas
 
 Se verificó que el proyecto usa:
+
 - ✅ `export const MyFunction = ...` (exportaciones nombradas)
 - ✅ `export type MyType = ...` (tipos nombrados)
 - ✅ `export { ... } from ...` (re-exportaciones)
@@ -90,14 +98,16 @@ Se verificó que el proyecto usa:
 ## Impacto en el Bundle
 
 ### Tamaño
-| Formato | Antes | Después | Cambio |
-|---------|-------|---------|--------|
-| ES Module (mjs) | 56.95 kB | 97.82 kB | +72% |
-| CommonJS (cjs) | 57.66 kB | 99.50 kB | +72% |
-| Gzip (mjs) | 15.34 kB | 21.28 kB | +39% |
-| Gzip (cjs) | 15.44 kB | 21.47 kB | +39% |
+
+| Formato         | Antes    | Después  | Cambio |
+| --------------- | -------- | -------- | ------ |
+| ES Module (mjs) | 56.95 kB | 97.82 kB | +72%   |
+| CommonJS (cjs)  | 57.66 kB | 99.50 kB | +72%   |
+| Gzip (mjs)      | 15.34 kB | 21.28 kB | +39%   |
+| Gzip (cjs)      | 15.44 kB | 21.47 kB | +39%   |
 
 **Nota**: El aumento es esperado y beneficioso porque:
+
 - Sin minificación, el código es más legible
 - Sin mangling de nombres, el tree shaking es más efectivo
 - El usuario final obtendrá un tamaño similar o menor después de SU minificación
@@ -105,11 +115,14 @@ Se verificó que el proyecto usa:
 ### Ejemplo: Antes vs Después
 
 **Código minificado (Terser)**:
+
 ```javascript
-const a=new e.BehaviorSubject,b=new e.Subject;
+const a = new e.BehaviorSubject(),
+  b = new e.Subject();
 ```
 
 **Código sin minificar (actual)**:
+
 ```javascript
 const fileSelectedSubject = new BehaviorSubject(null);
 const fileErrorSubject = new Subject();
@@ -128,7 +141,7 @@ rollupOptions: {
     "@preact/signals-core",
     "@xstate/graph"
   ],  // Estas dependencias NO se incluyen en el bundle
-  
+
   output: {
     exports: "named",  // Asegura que Rollup genere exportaciones nombradas
   },
@@ -138,6 +151,7 @@ rollupOptions: {
 **external**: Indica a Rollup que estas dependencias las proporcionará el usuario (son peerDependencies)
 
 **exports: "named"**: Rollup genera código como:
+
 ```javascript
 export const MyFunction = ...;
 export const MyClass = ...;
@@ -158,6 +172,7 @@ Esto le dice a Webpack, Rollup, esbuild, etc.:
 **Ejemplo**:
 
 Sin `sideEffects: false`:
+
 ```typescript
 // utils.ts
 console.log("Utils loaded"); // Terser: debe mantener esto
@@ -165,6 +180,7 @@ export const helper = () => {};
 ```
 
 Con `sideEffects: false`:
+
 ```typescript
 // Si no se importa helper(), este módulo completo se elimina
 ```
@@ -194,28 +210,31 @@ ls -lh dist/index.mjs dist/index.cjs
 Los usuarios de tu librería deben configurar su bundler así:
 
 ### Webpack
+
 ```javascript
 // webpack.config.js
 module.exports = {
-  mode: 'production', // Habilita minificación y tree shaking
+  mode: "production", // Habilita minificación y tree shaking
   optimization: {
     usedExports: true,
-    sideEffects: false
-  }
-}
+    sideEffects: false,
+  },
+};
 ```
 
 ### Vite
+
 ```javascript
 // vite.config.ts
 export default {
   build: {
-    minify: 'esbuild' // o 'terser'
-  }
-}
+    minify: "esbuild", // o 'terser'
+  },
+};
 ```
 
 ### Next.js
+
 ```javascript
 // Automático - Next.js respeta sideEffects: false
 // y hace tree shaking automáticamente
