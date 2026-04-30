@@ -513,37 +513,29 @@ Real-time reactive updates via RxJS and Preact Signals for state, context, metri
 
 ## 🌐 Deployment Options
 
-ETL CoreStream adapts to your environment:
+ETL CoreStream is **environment-agnostic**. Build custom modules to deploy anywhere:
 
-### Browser
+**Browser**
+- Implement IndexedDB persistence, file API importers, API exporters
+- Instant import and export with real-time editing
 
-- IndexedDB for local persistence
-- Instant import and export
-- Real-time editing with backend sync
+**Node.js / Deno**
+- Implement file system persistence, database adapters, scheduled pipelines
+- SQLite, PostgreSQL, or cloud database integration
 
-### Node.js / Deno
+**Edge Workers**
+- Implement Cloudflare Workers, AWS Lambda exporters
+- Stream data to cloud storage with real-time transformations
 
-- File system persistence
-- SQLite, PostgreSQL, or cloud databases
-- Scheduled ETL pipelines
+**Docker / Kubernetes**
+- Implement containerized modules with minimal resource overhead
+- Scales horizontally via service architecture
 
-### Edge Workers
+**Microservices**
+- Implement as a service module exposing REST/GraphQL APIs
+- Connect to message queues via custom exporters
 
-- Cloudflare Workers, AWS Lambda
-- Stream data to cloud storage
-- Real-time transformations at the edge
-
-### Docker / Kubernetes
-
-- Minimal resource usage
-- Scales horizontally
-- Perfect for microservices
-
-### Microservices
-
-- Run as a service
-- Expose via REST/GraphQL APIs
-- Connect to message queues
+**The power is yours:** Implement the interfaces you need for your environment. One core engine, infinite deployment possibilities.
 
 ---
 
