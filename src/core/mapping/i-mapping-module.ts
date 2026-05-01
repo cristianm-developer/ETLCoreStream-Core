@@ -1,11 +1,13 @@
 import type { LayoutBase } from "@/shared/schemes/layout-base";
 import type { LayoutHeader } from "@/shared/schemes/layout-header";
 
+export type RemapFn = (rowKeys: string[], headers: LayoutHeader[]) => Promise<[string, string][]>;
+
 export type MappingModuleOptions = {
   allowRemapColumns: boolean;
   ignoreRemapUnrequired: boolean;
   restCount?: number;
-  onRemapFn?: (rowKeys: string[], headers: LayoutHeader[]) => Promise<[string, string][]>;
+  onRemapFn?: RemapFn;
   preserveOriginalValue: boolean;
 };
 
