@@ -20,7 +20,7 @@ export type LocalStepResult = {
 };
 
 export interface ILocalStepsEngineModule {
-  getProgress: () => Signal<number | null>;
+  progress: number | null;
 
   handleStream: (
     stream: ReadableStream,

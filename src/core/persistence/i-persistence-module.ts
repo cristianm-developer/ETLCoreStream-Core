@@ -37,7 +37,7 @@ export const DEFAULT_PERSISTENCE_MODULE_OPTIONS: PersistenceModuleOptions = {
 export interface IPersistenceModule {
   id: "persistence-indexdb";
 
-  getProgress: () => Signal<number | null>;
+  progress: number | null;
 
   saveStream: (
     stream: ReadableStream<{ rawRows: RowObject[]; errorDicc: Record<number, ValidationError> }>,

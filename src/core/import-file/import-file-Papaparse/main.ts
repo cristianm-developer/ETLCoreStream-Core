@@ -20,7 +20,7 @@ export class ImportFilePapaparseModule implements IImportFileModule {
   private logger: LoggerModule;
   private config: ImportFileModuleOptions;
 
-  private progress = new Signal<number | null>(null);
+  private progressSignal = new Signal<number | null>(null);
 
   private totalRowsEstimated = new Signal<number | null>(null);
 
@@ -35,7 +35,9 @@ export class ImportFilePapaparseModule implements IImportFileModule {
     this.logger.log("ImportFilePapaparseModule initialized", "debug", "constructor", this.id);
   }
 
-  getProgress = () => this.progress;
+  get progress() {
+    return this.progressSignal.value;
+  }
 
   readFileStream = (file: File, signal?: AbortSignal): [ReadableStream, Signal<number | null>] => {
     const validationResult = validateFile(file, this.config);
@@ -109,7 +111,7 @@ export class ImportFilePapaparseModule implements IImportFileModule {
               this.totalRowsEstimated.value = Math.floor(fileSize / aproxRowSize);
             }
 
-            this.progress.value = progress;
+            this.progressSignal.value = progress;
 
             controller.enqueue({
               rows: results.data,
@@ -136,7 +138,7 @@ export class ImportFilePapaparseModule implements IImportFileModule {
             });
             controller.close();
             this.totalRowsEstimated.value = totalRowsProcessed;
-            this.progress.value = null;
+            this.progressSignal.value = null;
           },
           error: (err) => {
             this.logger.log(

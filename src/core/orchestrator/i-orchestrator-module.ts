@@ -23,10 +23,14 @@ export interface IOrchestratorModule {
   context$: Observable<OrchestratorContext>;
   metrics$: Observable<OrchestratorContext["metrics"]>;
   logs$: Observable<Log>;
-  file$: Observable<File | null>;
-  /* raw signals (for consumers that use Preact signals) */
-  stateSignal: Signal<OrchestratorStateType>;
-  metricsSignal: Signal<OrchestratorContext["metrics"]>;
+  file$: Observable<File | null>;  
+
+  //handler for signals access
+  state: OrchestratorStateType;
+  metrics: OrchestratorContext["metrics"];
+  progress: { label: string; value: number | null }[];
+  file: File | null;
+  context: OrchestratorContext;
 
   /* helper to retrieve logs synchronously from the logger */
   getLogs(

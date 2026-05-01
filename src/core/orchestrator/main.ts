@@ -9,7 +9,7 @@ import type { Log } from "@/shared/schemes/log";
 import type { ActorRefFrom } from "xstate";
 import { assign, createActor, createMachine, fromPromise } from "xstate";
 import type { Signal } from "@preact/signals-core";
-import { signal } from "@preact/signals-core";
+import { computed, signal } from "@preact/signals-core";
 import type { OrchestratorEvent } from "./schemes/orchestrator-event";
 import type { RowObject } from "@/shared/schemes/row-object";
 import type { IOrchestratorModule } from "./i-orchestrator-module";
@@ -55,24 +55,35 @@ export class OrchestratorModule implements IOrchestratorModule {
   readonly progress$: Observable<{ label: string; value: number | null }[]> =
     this.progressSubject.asObservable();
 
-  public stateSignal: Signal<OrchestratorStateType> = signal<OrchestratorStateType>("initializing");
+  get progress() {
+    return this.progressSignal.value;
+  }
+  private stateSignal: Signal<OrchestratorStateType> = signal<OrchestratorStateType>("initializing");
   get state() {
     return this.stateSignal.value;
   }
-  state$!: Observable<OrchestratorStateType>;
-  public metricsSignal: Signal<OrchestratorContext["metrics"]> = signal<
+  private metricsSignal: Signal<OrchestratorContext["metrics"]> = signal<
     OrchestratorContext["metrics"]
   >(DEFAULT_CONTEXT.metrics);
   get metrics() {
     return this.metricsSignal?.value;
   }
+  private fileSignal: Signal<File | null> = signal<File | null>(null);
+  get file() {
+    return this.fileSignal.value;
+  }
+  private contextSignal: Signal<OrchestratorContext> = signal<OrchestratorContext>(DEFAULT_CONTEXT);
+  get context() {
+    return this.contextSignal.value;
+  }
+  
   metrics$!: Observable<OrchestratorContext["metrics"]>;
-
   context$!: Observable<OrchestratorContext>;
+  state$!: Observable<OrchestratorStateType>;
   logs$!: Observable<Log>;
-
-  fileSubject: BehaviorSubject<File | null> = new BehaviorSubject<File | null>(null);
   file$!: Observable<File | null>;
+
+  private fileSubject: BehaviorSubject<File | null> = new BehaviorSubject<File | null>(null);
 
   private subscriptions = new Subscription();
 
@@ -112,6 +123,20 @@ export class OrchestratorModule implements IOrchestratorModule {
     this.createMachine();
     this.start();
   };
+
+
+  private progressSignal = computed(() => {
+    const modules = this.provider.modules;
+    const allProgress = [
+      { label: "import-file", value: modules.importer.progress },
+      { label: "mapping", value: modules.mapper.progress },
+      { label: "handling-local-step", value: modules.localStepEngine.progress },
+      { label: "persisting", value: modules.persistence.progress },
+      { label: "handle-global-steps", value: modules.globalStepEngine.progress },
+    ]
+
+    return allProgress.filter((e) => e.value !== null);
+  })
 
   private createMachine = () => {
     if (this.actor) return;
@@ -814,22 +839,12 @@ export class OrchestratorModule implements IOrchestratorModule {
     this.subscriptions.add(
       snapshot$
         .pipe(
-          map((s) => s.context.progress.filter((e: any) => e.value !== null)),
-          distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
-        )
-        .subscribe((val) => {
-          this.progressSubject.next(val);
-        })
-    );
-
-    this.subscriptions.add(
-      snapshot$
-        .pipe(
           map((s) => s.context.file ?? null),
           distinctUntilChanged((prev, curr) => prev?.name === curr?.name)
         )
         .subscribe((val) => {
           this.fileSubject.next(val);
+          this.fileSignal.value = val;
         })
     );
 
@@ -841,6 +856,7 @@ export class OrchestratorModule implements IOrchestratorModule {
         )
         .subscribe((val) => {
           this.contextSubject.next(val);
+          this.contextSignal.value = val;
         })
     );
 
@@ -862,6 +878,7 @@ export class OrchestratorModule implements IOrchestratorModule {
     this.metricsSubject.complete();
     this.progressSubject.complete();
     this.fileSubject.complete();
+    this.contextSubject.complete();
     this.cleanPersistence();
 
     this.logger.log("Orchestrator stopped", "info", "stop", this.id);

@@ -15,7 +15,10 @@ export class MappingModule implements IMappingModule {
   private options: MappingModuleOptions;
   private logger: LoggerModule;
   private startTime: number = 0;
-  private progress = new Signal<number | null>(null);
+  private progressSignal = new Signal<number | null>(null);
+  get progress() {
+    return this.progressSignal.value;
+  }
 
   constructor(logger: LoggerModule, options?: MappingModuleOptions) {
     this.logger = logger;
@@ -25,7 +28,6 @@ export class MappingModule implements IMappingModule {
     this.logger.log("MappingModule initialized", "debug", "constructor", this.id);
   }
 
-  getProgress = () => this.progress;
 
   handleStream = async (
     stream: ReadableStream,
@@ -67,7 +69,7 @@ export class MappingModule implements IMappingModule {
             const mapped: { [key: string]: any } = {};
             totalRowsCount++;
 
-            this.progress.value = Math.round((totalRowsCount / totalRowEstimated) * 100);
+            this.progressSignal.value = Math.round((totalRowsCount / totalRowEstimated) * 100);
 
             for (let j = 0; j < mapLen; j++) {
               const [internalKey, externalKey] = columnMapEntries[j];
@@ -112,7 +114,7 @@ export class MappingModule implements IMappingModule {
       flush: () => {
         this.logger.updateStatus({ order, progress: 100, status: "completed", step });
         this.logger.log("Stream mapping completed", "debug", step, this.id);
-        this.progress.value = null;
+        this.progressSignal.value = null;
       },
     });
 

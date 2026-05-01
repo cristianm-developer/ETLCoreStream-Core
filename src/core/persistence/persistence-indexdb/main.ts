@@ -14,7 +14,10 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
 
   private db: IDBDatabase | null = null;
 
-  private progress = new Signal<number | null>(null);
+  private progressSignal = new Signal<number | null>(null);
+  get progress() {
+    return this.progressSignal.value;
+  }
 
   constructor(logger: LoggerModule, options: PersistenceModuleOptions) {
     this.logger = logger;
@@ -25,7 +28,7 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
     this.getErrorsStream = this.getErrorsStream.bind(this);
   }
 
-  getProgress = () => this.progress;
+  getProgress = () => this.progressSignal;
 
   private initDb: () => Promise<IDBDatabase> = async () => {
     if (this.db) {
@@ -48,7 +51,7 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
         if (!db.objectStoreNames.contains(this.options.storeNames.rows)) {
           db.createObjectStore(this.options.storeNames.rows, {
             keyPath: this.options.storeKeys.rows,
-          });
+          }); 
         }
         if (!db.objectStoreNames.contains(this.options.storeNames.errors)) {
           db.createObjectStore(this.options.storeNames.errors, {
@@ -448,9 +451,9 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
 
           totalRowsProcessed += rows.length;
           if (totalRowEstimated !== null) {
-            this.progress.value = Math.round((totalRowsProcessed / totalRowEstimated) * 100);
+            this.progressSignal.value = Math.round((totalRowsProcessed / totalRowEstimated) * 100);
           } else {
-            this.progress.value = null;
+            this.progressSignal.value = null;
           }
         } catch (error) {
           this.logger.log(

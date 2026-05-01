@@ -18,7 +18,7 @@ export const DEFAULT_MAP_HEADERS_OPTIONS: MappingModuleOptions = {
 };
 
 export interface IMappingModule {
-  getProgress: () => Signal<number | null>;
+  progress: number | null;
   handleStream: (
     stream: ReadableStream,
     layout: LayoutBase,

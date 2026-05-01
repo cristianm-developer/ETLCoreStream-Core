@@ -18,7 +18,10 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
   private options: LocalStepsEngineModuleOptions;
   private logger: LoggerModule;
 
-  private progress = new Signal<number | null>(null);
+  private progressSignal = new Signal<number | null>(null);
+  get progress() {
+    return this.progressSignal.value;
+  }
 
   constructor(logger: LoggerModule, options: LocalStepsEngineModuleOptions) {
     this.options = { ...DEFAULT_STEPS_ENGINE_OPTIONS, ...options };
@@ -26,7 +29,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
     this.logger.log("LocalStepsEngineModule initialized", "debug", "constructor", this.id);
   }
 
-  getProgress = () => this.progress;
+  getProgress = () => this.progressSignal;
 
   handleStream = async (
     stream: ReadableStream,
@@ -57,7 +60,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
             const row = rows[i] as RowObject;
             const steps = layout.localSteps;
 
-            this.progress.value = Math.round((totalRowsProcessed / totalRowEstimated) * 100);
+            this.progressSignal.value = Math.round((totalRowsProcessed / totalRowEstimated) * 100);
 
             if (row.__sError) {
               this.logger.log(
@@ -116,7 +119,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
           status: "completed",
           step: "steps-engine",
         });
-        this.progress.value = null;
+        this.progressSignal.value = null;
       },
     });
 

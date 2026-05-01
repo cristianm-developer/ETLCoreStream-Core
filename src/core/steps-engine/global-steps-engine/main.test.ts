@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { GlobalStepsEngineModule } from "./main";
 import { LoggerModule } from "../../logger/logger-native/main";
-import { IPersistenceModule } from "../../persistence/i-persistence-module";
-import { LayoutBase } from "@/shared/schemes/layout-base";
 import { GlobalStep } from "@/shared/schemes/layout-global-step";
 import { RowObject } from "@/shared/schemes/row-object";
 import { GlobalStepTransform } from "@/shared/schemes/global-step-transform";
@@ -15,7 +13,6 @@ vi.mock("../../logger/logger-native/main");
 describe("GlobalStepsEngineModule", () => {
   let stepsEngineModule: GlobalStepsEngineModule;
   let mockLogger: any;
-  let mockPersistenceModule: any;
 
   const createMockTransform = (overrides?: Partial<GlobalStepTransform>): GlobalStepTransform => ({
     name: "testTransform",
@@ -31,7 +28,7 @@ describe("GlobalStepsEngineModule", () => {
   const createMockValidator = (overrides?: Partial<GlobalStepValidator>): GlobalStepValidator => ({
     name: "testValidator",
     headerKey: "name",
-    fn: vi.fn(async (_rows: RowObject[]) => ({
+    fn: vi.fn(async () => ({
       validationErrors: [],
       removedValidationErrors: [],
     })),
@@ -45,16 +42,7 @@ describe("GlobalStepsEngineModule", () => {
       reprocessAllRowsOnChange: false,
       order: ["validators", "transforms"] as GlobalStep["order"],
       filter: {
-        rows: vi.fn((_filter: RowFilter) => {
-          return new ReadableStream({
-            start(controller) {
-              controller.enqueue({
-                rows: [createMockRowObject()],
-              });
-              controller.close();
-            },
-          });
-        }),
+        rows: vi.fn((_filter: RowFilter) => new ReadableStream()),
         errors: {},
       },
       transforms: [createMockTransform()],
@@ -64,18 +52,6 @@ describe("GlobalStepsEngineModule", () => {
     return step as GlobalStep;
   };
 
-  const createMockLayout = (overrides?: Partial<LayoutBase>): LayoutBase => ({
-    id: "layout-1",
-    name: "Test Layout",
-    description: "A test layout",
-    globalSteps: [createMockGlobalStep()],
-    localSteps: [],
-    allowUndefinedColumns: false,
-    headers: [],
-    exports: {},
-    ...overrides,
-  });
-
   const createMockRowObject = (overrides?: Partial<RowObject>): RowObject => ({
     __rowId: 1,
     __sError: null,
@@ -84,44 +60,50 @@ describe("GlobalStepsEngineModule", () => {
     ...overrides,
   });
 
-  const createMockPersistenceModule = (): any => ({
-    saveStream: vi.fn().mockResolvedValue(undefined),
-    getRowsStream: vi.fn().mockReturnValue(
-      new ReadableStream({
-        start(controller) {
-          controller.close();
-        },
-      })
-    ),
-    getErrorsStream: vi.fn().mockReturnValue(
-      new ReadableStream({
-        start(controller) {
-          controller.close();
-        },
-      })
-    ),
-    clear: vi.fn().mockResolvedValue(undefined),
-    updateRows: vi.fn().mockResolvedValue(undefined),
-    deleteRows: vi.fn().mockResolvedValue(undefined),
-    deleteRow: vi.fn().mockResolvedValue(undefined),
-  });
+  async function readAllFromHandleStep(
+    module: GlobalStepsEngineModule,
+    step: GlobalStep,
+    chunks: RowObject[][],
+    totalRowsEstimated: number | null = null,
+    signal?: AbortSignal
+  ) {
+    const sourceStream = new ReadableStream<{ rows: RowObject[] }>({
+      start(controller) {
+        for (const rows of chunks) {
+          controller.enqueue({ rows });
+        }
+        controller.close();
+      },
+    });
+
+    const out = module.handleStep(sourceStream, step, totalRowsEstimated, signal);
+    const reader = out.getReader();
+    const results: {
+      rows: RowObject[];
+      errors: ValidationError[];
+      removedErrors: number[];
+    }[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) results.push(value);
+    }
+    return results;
+  }
 
   beforeEach(() => {
     mockLogger = {
       log: vi.fn(),
-      updateStatus: vi.fn(),
       id: "test-logger",
     };
 
-    mockPersistenceModule = createMockPersistenceModule();
-
     vi.mocked(LoggerModule).mockImplementation(() => mockLogger);
-    stepsEngineModule = new GlobalStepsEngineModule(mockLogger, mockPersistenceModule);
+    stepsEngineModule = new GlobalStepsEngineModule(mockLogger);
   });
 
   describe("Constructor", () => {
-    it("should initialize with logger and persistence module", () => {
-      const module = new GlobalStepsEngineModule(mockLogger, mockPersistenceModule);
+    it("should initialize with logger", () => {
+      new GlobalStepsEngineModule(mockLogger);
       expect(mockLogger.log).toHaveBeenCalledWith(
         "GlobalStepsEngineModule initialized",
         "debug",
@@ -130,678 +112,171 @@ describe("GlobalStepsEngineModule", () => {
       );
     });
 
-    it("should store logger and persistence module", () => {
-      const module = new GlobalStepsEngineModule(mockLogger, mockPersistenceModule);
+    it("should create module instance", () => {
+      const module = new GlobalStepsEngineModule(mockLogger);
       expect(module).toBeDefined();
     });
   });
 
-  describe("handleSteps", () => {
-    it("should process global steps for layout", async () => {
-      const layout = createMockLayout();
+  describe("handleStep", () => {
+    it("should emit rows, errors, and removedErrors per chunk", async () => {
+      const step = createMockGlobalStep();
+      const rows = [createMockRowObject()];
+      const [chunk] = await readAllFromHandleStep(stepsEngineModule, step, [rows]);
 
-      await stepsEngineModule.handleSteps(layout, undefined);
-
-      expect(mockLogger.updateStatus).toHaveBeenCalledWith(
-        expect.objectContaining({
-          order: 1,
-          progress: 0,
-          status: "running",
-          step: "handleSteps",
-        })
-      );
+      expect(chunk.rows).toHaveLength(1);
+      expect(chunk.errors).toEqual([]);
+      expect(chunk.removedErrors).toEqual([]);
     });
 
-    it("should execute all global steps in order", async () => {
-      const transform = createMockTransform();
-      const validator = createMockValidator();
-      const step1 = createMockGlobalStep({
-        name: "step1",
-        transforms: [transform],
-        validators: [validator],
+    it("should run validators then transforms when order is validators, transforms", async () => {
+      const transformFn = vi.fn(async (r: RowObject[]) => {
+        r.forEach((row) => {
+          row.value = { ...row.value, order: "after-transform" };
+        });
       });
+      const validatorFn = vi.fn(async () => ({
+        validationErrors: [],
+        removedValidationErrors: [],
+      }));
 
-      const layout = createMockLayout({
-        globalSteps: [step1],
-      });
-
-      await stepsEngineModule.handleSteps(layout, undefined);
-
-      expect(mockLogger.log).toHaveBeenCalled();
-    });
-
-    it("should handle abort signal", async () => {
-      const controller = new AbortController();
-      controller.abort();
-
-      const layout = createMockLayout();
-
-      await expect(
-        stepsEngineModule.handleSteps(layout, undefined, controller.signal)
-      ).rejects.toThrow();
-    });
-
-    it("should log errors and re-throw", async () => {
-      const layout = createMockLayout({
-        globalSteps: [
-          {
-            ...createMockGlobalStep(),
-            filter: {
-              rows: () => {
-                throw new Error("Source error");
-              },
-              errors: {},
-            } as GlobalStep["filter"],
-          },
+      const step = createMockGlobalStep({
+        order: ["validators", "transforms"] as GlobalStep["order"],
+        transforms: [
+          createMockTransform({
+            fn: transformFn,
+          }),
+        ],
+        validators: [
+          createMockValidator({
+            fn: validatorFn,
+          }),
         ],
       });
 
-      try {
-        await stepsEngineModule.handleSteps(layout, undefined);
-      } catch (error) {
-        expect(mockLogger.log).toHaveBeenCalledWith(
-          expect.any(String),
-          "error",
-          "handleSteps",
-          expect.any(String)
-        );
-      }
+      await readAllFromHandleStep(stepsEngineModule, step, [[createMockRowObject()]]);
+
+      const validatorOrder = validatorFn.mock.invocationCallOrder[0];
+      const transformOrder = transformFn.mock.invocationCallOrder[0];
+      expect(validatorOrder).toBeLessThan(transformOrder);
     });
 
-    it("should handle empty global steps", async () => {
-      const layout = createMockLayout({
-        globalSteps: [],
-      });
-
-      await stepsEngineModule.handleSteps(layout, undefined);
-
-      expect(mockLogger.log).toHaveBeenCalled();
-    });
-
-    it("should handle multiple global steps", async () => {
-      const step1 = createMockGlobalStep({ name: "step1" });
-      const step2 = createMockGlobalStep({ name: "step2" });
-
-      const layout = createMockLayout({
-        globalSteps: [step1, step2],
-      });
-
-      await stepsEngineModule.handleSteps(layout, undefined);
-
-      expect(mockLogger.log).toHaveBeenCalled();
-    });
-  });
-
-  describe("handleStepTransform", () => {
-    it("should handle transform stream with rows", async () => {
-      const transform = createMockTransform();
-      const step = createMockGlobalStep({
-        transforms: [transform],
-      });
-
-      const sourceStream = new ReadableStream({
-        start(controller) {
-          controller.enqueue({
-            rows: [createMockRowObject()],
-          });
-          controller.close();
-        },
-      });
-
-      const resultStream = await stepsEngineModule["handleStepTransform"](
-        step,
-        transform,
-        undefined,
-        sourceStream
-      );
-
-      const reader = resultStream.getReader();
-      const { value } = await reader.read();
-
-      expect(value).toBeDefined();
-      expect(value.rows).toBeDefined();
-      expect(value.rows.length).toBeGreaterThan(0);
-    });
-
-    it("should log transform execution", async () => {
-      const transform = createMockTransform();
-      const step = createMockGlobalStep();
-
-      const sourceStream = new ReadableStream({
-        start(controller) {
-          controller.enqueue({ rows: [createMockRowObject()] });
-          controller.close();
-        },
-      });
-
-      await stepsEngineModule["handleStepTransform"](step, transform, undefined, sourceStream);
-
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.stringContaining("Handling step transform"),
-        "debug",
-        "handleStepTransform",
-        expect.any(String)
-      );
-    });
-
-    it("should handle transform errors", async () => {
-      const errorTransform = createMockTransform({
-        fn: vi.fn(async () => {
-          throw new Error("Transform error");
-        }),
-      });
-
-      const step = createMockGlobalStep();
-
-      const sourceStream = new ReadableStream({
-        start(controller) {
-          controller.enqueue({ rows: [createMockRowObject()] });
-          controller.close();
-        },
-      });
-
-      const resultStream = await stepsEngineModule["handleStepTransform"](
-        step,
-        errorTransform,
-        undefined,
-        sourceStream
-      );
-
-      const reader = resultStream.getReader();
-
-      let error: any = null;
-      try {
-        while (true) {
-          const { done } = await reader.read();
-          if (done) break;
-        }
-      } catch (e) {
-        error = e;
-      }
-
-      if (error) {
-        expect(error).toBeDefined();
-      }
-    });
-
-    it("should handle abort signal during transform", async () => {
-      const controller = new AbortController();
-      const transform = createMockTransform();
-      const step = createMockGlobalStep();
-
-      controller.abort();
-
-      const sourceStream = new ReadableStream({
-        start(c) {
-          c.close();
-        },
-      });
-
-      await expect(
-        stepsEngineModule["handleStepTransform"](step, transform, controller.signal, sourceStream)
-      ).rejects.toThrow();
-    });
-
-    it("should use filter.rows when no input stream provided", async () => {
-      const rowsMock = vi.fn(
-        (_filter: RowFilter) =>
-          new ReadableStream({
-            start(controller) {
-              controller.enqueue({ rows: [createMockRowObject()] });
-              controller.close();
-            },
-          })
-      );
-
-      const transform = createMockTransform();
-      const step = createMockGlobalStep({
-        filter: {
-          rows: rowsMock as unknown as GlobalStep["filter"]["rows"],
-          errors: {},
-        },
-      });
-
-      const resultStream = await stepsEngineModule["handleStepTransform"](step, transform);
-
-      expect(rowsMock).toHaveBeenCalled();
-      await resultStream.cancel();
-    });
-
-    it("should update status on transform completion", async () => {
-      const transform = createMockTransform();
-      const step = createMockGlobalStep();
-
-      const sourceStream = new ReadableStream({
-        start(controller) {
-          controller.enqueue({ rows: [createMockRowObject()] });
-          controller.close();
-        },
-      });
-
-      const resultStream = await stepsEngineModule["handleStepTransform"](
-        step,
-        transform,
-        undefined,
-        sourceStream
-      );
-
-      const reader = resultStream.getReader();
-      while (true) {
-        const { done } = await reader.read();
-        if (done) break;
-      }
-
-      expect(mockLogger.updateStatus).toHaveBeenCalledWith(
-        expect.objectContaining({
-          progress: 100,
-          status: "completed",
-        })
-      );
-    });
-  });
-
-  describe("handleStepValidator", () => {
-    it("should handle validator stream with rows", async () => {
-      const validator = createMockValidator();
-      const step = createMockGlobalStep();
-
-      const sourceStream = new ReadableStream({
-        start(controller) {
-          controller.enqueue({
-            rows: [createMockRowObject()],
-          });
-          controller.close();
-        },
-      });
-
-      const resultStream = await stepsEngineModule["handleStepValidator"](
-        step,
-        validator,
-        { errors: [], removedErrors: [] },
-        undefined,
-        sourceStream
-      );
-
-      const reader = resultStream.getReader();
-      const { value } = await reader.read();
-
-      expect(value).toBeDefined();
-      expect(value.errors).toBeDefined();
-      expect(value.rows).toBeDefined();
-    });
-
-    it("should return validation errors in stream", async () => {
-      const validationError = {
+    it("should append validation errors from validators", async () => {
+      const validationError: ValidationError = {
         __rowId: 1,
         headerKey: "name",
         validationCode: "INVALID",
         message: "Invalid",
+        step: "test",
       };
 
-      const validator = createMockValidator({
-        fn: vi.fn(async () => ({
-          validationErrors: [validationError as ValidationError],
-          removedValidationErrors: [],
-        })),
+      const step = createMockGlobalStep({
+        validators: [
+          createMockValidator({
+            fn: vi.fn(async () => ({
+              validationErrors: [validationError],
+              removedValidationErrors: [],
+            })),
+          }),
+        ],
       });
 
-      const step = createMockGlobalStep();
+      const [chunk] = await readAllFromHandleStep(stepsEngineModule, step, [
+        [createMockRowObject()],
+      ]);
 
-      const sourceStream = new ReadableStream({
+      expect(chunk.errors).toHaveLength(1);
+      expect(chunk.errors[0]).toMatchObject({ validationCode: "INVALID" });
+    });
+
+    it("should propagate validator failures when reading the stream", async () => {
+      const step = createMockGlobalStep({
+        validators: [
+          createMockValidator({
+            fn: vi.fn(async () => {
+              throw new Error("Validator error");
+            }),
+          }),
+        ],
+      });
+
+      const sourceStream = new ReadableStream<{ rows: RowObject[] }>({
         start(controller) {
           controller.enqueue({ rows: [createMockRowObject()] });
           controller.close();
         },
       });
 
-      const resultStream = await stepsEngineModule["handleStepValidator"](
-        step,
-        validator,
-        { errors: [], removedErrors: [] },
-        undefined,
-        sourceStream
-      );
+      const out = stepsEngineModule.handleStep(sourceStream, step, null);
+      const reader = out.getReader();
 
-      const reader = resultStream.getReader();
-      const { value } = await reader.read();
-
-      expect(value.errors).toHaveLength(1);
-      expect(value.errors[0]).toMatchObject({
-        validationCode: "INVALID",
-      });
+      await expect(reader.read()).rejects.toThrow("Validator error");
     });
 
-    it("should handle validator errors", async () => {
-      const errorValidator = createMockValidator({
-        fn: vi.fn(async () => {
-          throw new Error("Validator error");
-        }),
-      });
-
-      const step = createMockGlobalStep();
-
-      const sourceStream = new ReadableStream({
-        start(controller) {
-          controller.enqueue({ rows: [createMockRowObject()] });
-          controller.close();
-        },
-      });
-
-      const resultStream = await stepsEngineModule["handleStepValidator"](
-        step,
-        errorValidator,
-        { errors: [], removedErrors: [] },
-        undefined,
-        sourceStream
-      );
-
-      const reader = resultStream.getReader();
-
-      let error: any = null;
-      try {
-        while (true) {
-          const { done } = await reader.read();
-          if (done) break;
-        }
-      } catch (e) {
-        error = e;
-      }
-
-      if (error) {
-        expect(error).toBeDefined();
-      }
-    });
-
-    it("should handle abort signal during validation", async () => {
+    it("should throw if signal is already aborted before piping", () => {
       const controller = new AbortController();
-      const validator = createMockValidator();
-      const step = createMockGlobalStep();
-
       controller.abort();
 
-      const sourceStream = new ReadableStream({
+      const sourceStream = new ReadableStream<{ rows: RowObject[] }>({
         start(c) {
           c.close();
         },
       });
 
-      await expect(
-        stepsEngineModule["handleStepValidator"](
-          step,
-          validator,
-          { errors: [], removedErrors: [] },
-          controller.signal,
-          sourceStream
-        )
-      ).rejects.toThrow();
+      expect(() =>
+        stepsEngineModule.handleStep(sourceStream, createMockGlobalStep(), null, controller.signal)
+      ).toThrow();
     });
 
-    it("should log validator execution", async () => {
-      const validator = createMockValidator();
-      const step = createMockGlobalStep();
+    it("should skip rows with __sError for transforms and validators", async () => {
+      const transformFn = vi.fn(async (_rows: RowObject[]) => {});
+      const validatorFn = vi.fn(async () => ({
+        validationErrors: [],
+        removedValidationErrors: [],
+      }));
 
-      const sourceStream = new ReadableStream({
+      const step = createMockGlobalStep({
+        order: ["transforms", "validators"] as GlobalStep["order"],
+        transforms: [createMockTransform({ fn: transformFn })],
+        validators: [createMockValidator({ fn: validatorFn })],
+      });
+
+      const rowOk = createMockRowObject({ __rowId: 1, __sError: null });
+      const rowErr = createMockRowObject({ __rowId: 2, __sError: "x" });
+      await readAllFromHandleStep(stepsEngineModule, step, [[rowOk, rowErr]]);
+
+      expect(transformFn).toHaveBeenCalledTimes(1);
+      const passedRows = transformFn.mock.calls[0][0] as RowObject[];
+      expect(passedRows).toHaveLength(1);
+      expect(passedRows[0].__rowId).toBe(1);
+    });
+
+    it("should update progress from totalRowsEstimated across chunks", async () => {
+      const step = createMockGlobalStep({
+        transforms: [],
+        validators: [],
+      });
+
+      const sourceStream = new ReadableStream<{ rows: RowObject[] }>({
         start(controller) {
-          controller.enqueue({ rows: [createMockRowObject()] });
+          controller.enqueue({ rows: [createMockRowObject({ __rowId: 1 })] });
+          controller.enqueue({ rows: [createMockRowObject({ __rowId: 2 })] });
           controller.close();
         },
       });
 
-      await stepsEngineModule["handleStepValidator"](
-        step,
-        validator,
-        { errors: [], removedErrors: [] },
-        undefined,
-        sourceStream
-      );
-
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        expect.stringContaining("Handling step validator"),
-        "debug",
-        "handleStepValidator",
-        expect.any(String)
-      );
-    });
-
-    it("should update status on validation completion", async () => {
-      const validator = createMockValidator();
-      const step = createMockGlobalStep();
-
-      const sourceStream = new ReadableStream({
-        start(controller) {
-          controller.enqueue({ rows: [createMockRowObject()] });
-          controller.close();
-        },
-      });
-
-      const resultStream = await stepsEngineModule["handleStepValidator"](
-        step,
-        validator,
-        { errors: [], removedErrors: [] },
-        undefined,
-        sourceStream
-      );
-
-      const reader = resultStream.getReader();
+      const out = stepsEngineModule.handleStep(sourceStream, step, 2);
+      const reader = out.getReader();
+      const progresses: (number | null)[] = [];
+      progresses.push(stepsEngineModule.progress);
       while (true) {
         const { done } = await reader.read();
+        progresses.push(stepsEngineModule.progress);
         if (done) break;
       }
 
-      expect(mockLogger.updateStatus).toHaveBeenCalledWith(
-        expect.objectContaining({
-          progress: 100,
-          status: "completed",
-        })
-      );
-    });
-  });
-
-  describe("saveValidationResult", () => {
-    it("should save validation errors to persistence module", async () => {
-      const stream = new ReadableStream({
-        start(controller) {
-          controller.enqueue({
-            errors: [],
-            removedErrors: [],
-            rows: [createMockRowObject()],
-          });
-          controller.close();
-        },
-      });
-
-      await stepsEngineModule["saveValidationResult"](stream);
-
-      expect(mockPersistenceModule.saveStream).toHaveBeenCalled();
-    });
-
-    it("should delete removed error rows", async () => {
-      const stream = new ReadableStream({
-        start(controller) {
-          controller.enqueue({
-            errors: [],
-            removedErrors: [1, 2, 3],
-            rows: [createMockRowObject()],
-          });
-          controller.close();
-        },
-      });
-
-      await stepsEngineModule["saveValidationResult"](stream);
-
-      expect(mockPersistenceModule.saveStream).toHaveBeenCalled();
-      expect(mockPersistenceModule.deleteRow).toHaveBeenCalledTimes(3);
-      expect(mockPersistenceModule.deleteRow).toHaveBeenCalledWith(1);
-      expect(mockPersistenceModule.deleteRow).toHaveBeenCalledWith(2);
-      expect(mockPersistenceModule.deleteRow).toHaveBeenCalledWith(3);
-    });
-
-    it("should mark rows with errors", async () => {
-      const rowWithError = createMockRowObject({ __rowId: 1 });
-      const stream = new ReadableStream({
-        start(controller) {
-          const error: ValidationError = {
-            __rowId: 1,
-            headerKey: "name",
-            validationCode: "INVALID",
-            message: "Invalid",
-            value: "test",
-            originalValue: "test",
-            step: "test",
-          };
-          controller.enqueue({
-            errors: [error],
-            removedErrors: [],
-            rows: [rowWithError],
-          });
-          controller.close();
-        },
-      });
-
-      await stepsEngineModule["saveValidationResult"](stream);
-
-      expect(mockPersistenceModule.saveStream).toHaveBeenCalled();
-    });
-
-    it("should call persistence module saveStream", async () => {
-      const stream = new ReadableStream({
-        start(controller) {
-          controller.enqueue({
-            errors: [],
-            removedErrors: [],
-            rows: [createMockRowObject()],
-          });
-          controller.close();
-        },
-      });
-
-      await stepsEngineModule["saveValidationResult"](stream);
-
-      expect(mockPersistenceModule.saveStream).toHaveBeenCalled();
-    });
-
-    it("should call deleteRows for removed errors", async () => {
-      const stream = new ReadableStream({
-        start(controller) {
-          controller.enqueue({
-            errors: [],
-            removedErrors: [1, 2, 3],
-            rows: [createMockRowObject()],
-          });
-          controller.close();
-        },
-      });
-
-      await stepsEngineModule["saveValidationResult"](stream);
-
-      expect(mockPersistenceModule.saveStream).toHaveBeenCalled();
-      expect(mockPersistenceModule.deleteRow).toHaveBeenCalledTimes(3);
-    });
-  });
-
-  describe("handleAbortSignal", () => {
-    it("should throw when signal is aborted", () => {
-      const controller = new AbortController();
-      controller.abort();
-
-      expect(() => {
-        stepsEngineModule["handleAbortSignal"](controller.signal);
-      }).toThrow();
-    });
-
-    it("should not throw when signal is not aborted", () => {
-      const controller = new AbortController();
-
-      expect(() => {
-        stepsEngineModule["handleAbortSignal"](controller.signal);
-      }).not.toThrow();
-    });
-
-    it("should not throw when signal is undefined", () => {
-      expect(() => {
-        stepsEngineModule["handleAbortSignal"](undefined);
-      }).not.toThrow();
-    });
-  });
-
-  describe("Integration tests", () => {
-    it("should handle complete flow with transforms and validators", async () => {
-      const transform = createMockTransform();
-      const validator = createMockValidator();
-
-      const step = createMockGlobalStep({
-        order: ["transforms", "validators"] as any,
-        transforms: [transform],
-        validators: [validator],
-      });
-
-      const layout = createMockLayout({
-        globalSteps: [step],
-      });
-
-      await stepsEngineModule.handleSteps(layout, undefined);
-
-      expect(mockLogger.updateStatus).toHaveBeenCalled();
-    });
-
-    it("should handle multiple transforms in sequence", async () => {
-      const transform1 = createMockTransform({ name: "transform1" });
-      const transform2 = createMockTransform({ name: "transform2" });
-
-      const step = createMockGlobalStep({
-        order: ["transforms"] as any,
-        transforms: [transform1, transform2],
-      });
-
-      const layout = createMockLayout({
-        globalSteps: [step],
-      });
-
-      await stepsEngineModule.handleSteps(layout, undefined);
-
-      expect(mockLogger.log).toHaveBeenCalled();
-    });
-
-    it("should handle validation errors across multiple rows", async () => {
-      const validator = createMockValidator({
-        fn: vi.fn(async (rows: RowObject[]) => ({
-          validationErrors: rows.map(
-            (r) =>
-              ({
-                __rowId: r.__rowId,
-                headerKey: "name",
-                validationCode: "INVALID",
-                message: "Invalid",
-              }) as ValidationError
-          ),
-          removedValidationErrors: [],
-        })),
-      });
-
-      const step = createMockGlobalStep({
-        order: ["validators"] as GlobalStep["order"],
-        validators: [validator],
-        filter: {
-          rows: (() =>
-            new ReadableStream({
-              start(controller) {
-                controller.enqueue({
-                  rows: [createMockRowObject({ __rowId: 1 }), createMockRowObject({ __rowId: 2 })],
-                });
-                controller.close();
-              },
-            })) as unknown as GlobalStep["filter"]["rows"],
-          errors: {},
-        },
-      });
-
-      const layout = createMockLayout({
-        globalSteps: [step],
-      });
-
-      await stepsEngineModule.handleSteps(layout, undefined);
-
-      expect(mockPersistenceModule.saveStream).toHaveBeenCalled();
+      expect(progresses.some((p) => p === 50)).toBe(true);
+      expect(stepsEngineModule.progress).toBeNull();
     });
   });
 });
