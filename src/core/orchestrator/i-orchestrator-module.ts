@@ -22,6 +22,7 @@ export interface IOrchestratorModule {
   logs$: Observable<Log>;
   layout$: Observable<LayoutBase | null>;
   file$: Observable<File | null>;
+  notification$: Observable<Notification>;
 
   //handler for signals access
   layout: LayoutBase;

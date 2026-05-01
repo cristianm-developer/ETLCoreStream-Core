@@ -78,13 +78,14 @@ export class OrchestratorModule implements IOrchestratorModule {
     return this.contextSignal.value;
   }
 
-  metrics$!: Observable<OrchestratorContext["metrics"]>;
-  context$!: Observable<OrchestratorContext>;
-  state$!: Observable<OrchestratorStateType>;
-  logs$!: Observable<Log>;
-  file$!: Observable<File | null>;
+  metrics$: Observable<OrchestratorContext["metrics"]> = this.metricsSubject.asObservable();
+  context$: Observable<OrchestratorContext> = this.contextSubject.asObservable();
+  state$: Observable<OrchestratorStateType> = this.stateSubject.asObservable();
+  logs$: Observable<Log>;
 
   private fileSubject: BehaviorSubject<File | null> = new BehaviorSubject<File | null>(null);
+  file$: Observable<File | null> = this.fileSubject.asObservable();
+
 
   private subscriptions = new Subscription();
 
@@ -95,7 +96,10 @@ export class OrchestratorModule implements IOrchestratorModule {
 
   private layoutSubject: BehaviorSubject<LayoutBase | null> =
     new BehaviorSubject<LayoutBase | null>(null);
-  layout$!: Observable<LayoutBase | null>;
+  layout$: Observable<LayoutBase | null> = this.layoutSubject.asObservable();
+
+  private notificationSubject: BehaviorSubject<Notification> = new BehaviorSubject<Notification>(null);
+  notification$: Observable<Notification|null> = this.notificationSubject.asObservable();
 
   getId = (): string => this.id;
   getCurrentState = (): string => {
