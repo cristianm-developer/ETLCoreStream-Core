@@ -134,7 +134,7 @@ export class ExporterNativeModule implements IExporterModule {
     } finally {
       reader.releaseLock();
     }
- };
+  };
 
   updateOptions(options: Partial<ExporterModuleOptions>): void {
     this.options = { ...this.options, ...options };

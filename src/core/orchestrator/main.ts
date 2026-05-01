@@ -936,14 +936,19 @@ export class OrchestratorModule implements IOrchestratorModule {
   };
 
   public updateConfig = (module: string, options: any) => {
-    if(this.state === 'initializing' || this.state === 'waiting-layout'){
-      const moduleToConfig = this.provider.modules[module as keyof ProviderModule['modules']];
-      if(moduleToConfig){
+    if (this.state === "initializing" || this.state === "waiting-layout") {
+      const moduleToConfig = this.provider.modules[module as keyof ProviderModule["modules"]];
+      if (moduleToConfig) {
         moduleToConfig.updateOptions(options);
       }
     } else {
-      this.logger.log(`Cannot update config of module ${module} in state ${this.state}`, "error", "updateConfig", this.id);
+      this.logger.log(
+        `Cannot update config of module ${module} in state ${this.state}`,
+        "error",
+        "updateConfig",
+        this.id
+      );
       throw new Error(`Cannot update config of module ${module} in state ${this.state}`);
     }
-  }
+  };
 }

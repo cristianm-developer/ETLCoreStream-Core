@@ -1,6 +1,9 @@
 import type { GlobalStep } from "@/shared/schemes/layout-global-step";
 import type { RowObject } from "@/shared/schemes/row-object";
-import type { GlobalStepsEngineModuleOptions, IGlobalStepsEngineModule } from "../i-global-steps-engine-module";
+import type {
+  GlobalStepsEngineModuleOptions,
+  IGlobalStepsEngineModule,
+} from "../i-global-steps-engine-module";
 import type { LoggerModule } from "@/core/logger/logger-native/main";
 import type { GlobalStepTransform } from "@/shared/schemes/global-step-transform";
 import type { GlobalStepValidator } from "@/shared/schemes/global-step-validator";
@@ -12,7 +15,7 @@ export class GlobalStepsEngineModule implements IGlobalStepsEngineModule {
   private logger: LoggerModule;
   private progressSignal = new Signal<number | null>(null);
   private options: GlobalStepsEngineModuleOptions;
-  
+
   get progress() {
     return this.progressSignal.value;
   }

@@ -175,4 +175,3 @@ export class ImportFilePapaparseModule implements IImportFileModule {
     this.config = { ...this.config, ...options };
   }
 }
-
