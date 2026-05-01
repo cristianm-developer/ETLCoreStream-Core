@@ -13,6 +13,7 @@ import { computed, signal } from "@preact/signals-core";
 import type { OrchestratorEvent } from "./schemes/orchestrator-event";
 import type { RowObject } from "@/shared/schemes/row-object";
 import type { IOrchestratorModule } from "./i-orchestrator-module";
+import type { Notification } from "@/shared/schemes/notification";
 
 const DEFAULT_CONTEXT: OrchestratorContext = {
   file: null,
@@ -86,7 +87,6 @@ export class OrchestratorModule implements IOrchestratorModule {
   private fileSubject: BehaviorSubject<File | null> = new BehaviorSubject<File | null>(null);
   file$: Observable<File | null> = this.fileSubject.asObservable();
 
-
   private subscriptions = new Subscription();
 
   private layoutSignal: Signal<LayoutBase | null> = signal<LayoutBase | null>(null);
@@ -98,8 +98,9 @@ export class OrchestratorModule implements IOrchestratorModule {
     new BehaviorSubject<LayoutBase | null>(null);
   layout$: Observable<LayoutBase | null> = this.layoutSubject.asObservable();
 
-  private notificationSubject: BehaviorSubject<Notification> = new BehaviorSubject<Notification>(null);
-  notification$: Observable<Notification|null> = this.notificationSubject.asObservable();
+  private notificationSubject: BehaviorSubject<Notification | null> =
+    new BehaviorSubject<Notification | null>(null);
+  notification$: Observable<Notification | null> = this.notificationSubject.asObservable();
 
   getId = (): string => this.id;
   getCurrentState = (): string => {
@@ -425,6 +426,7 @@ export class OrchestratorModule implements IOrchestratorModule {
             entry: [
               () =>
                 this.logger.log("Waiting for user interaction...", "info", "waiting-user", this.id),
+              () => this.notify({ message: "Waiting for user interaction...", type: "info" }),
               assign({ processingRows: false, progress: [] }),
             ],
             on: {
@@ -455,6 +457,7 @@ export class OrchestratorModule implements IOrchestratorModule {
             entry: [
               () => this.logger.log("Editing row...", "info", "editing-row", this.id),
               assign({ processingRows: true }),
+              () => this.notify({ message: "Editing row...", type: "info" }),
             ],
             initial: "editing-data",
             states: {
@@ -471,7 +474,16 @@ export class OrchestratorModule implements IOrchestratorModule {
                   },
                   onError: {
                     target: "#ETL-error",
-                    actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                    actions: [
+                      () => this.logger.log("Error editing data", "error", "editing-data", this.id),
+                      ({ event }) =>
+                        this.notify({
+                          message: "Error editing data",
+                          type: "error",
+                          details: (event.error as Error).toString(),
+                        }),
+                      assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                    ],
                   },
                 },
               },
@@ -493,7 +505,22 @@ export class OrchestratorModule implements IOrchestratorModule {
                   },
                   onError: {
                     target: "#ETL-error",
-                    actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                    actions: [
+                      () =>
+                        this.logger.log(
+                          "Error local step pipe",
+                          "error",
+                          "local-step-pipe",
+                          this.id
+                        ),
+                      ({ event }) =>
+                        this.notify({
+                          message: "Error local step pipe",
+                          type: "error",
+                          details: (event.error as Error).toString(),
+                        }),
+                      assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                    ],
                   },
                 },
               },
@@ -511,7 +538,16 @@ export class OrchestratorModule implements IOrchestratorModule {
                   },
                   onError: {
                     target: "#ETL-error",
-                    actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                    actions: [
+                      () => this.logger.log("Error persisting", "error", "persisting", this.id),
+                      ({ event }) =>
+                        this.notify({
+                          message: "Error persisting",
+                          type: "error",
+                          details: (event.error as Error).toString(),
+                        }),
+                      assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                    ],
                   },
                 },
               },
@@ -532,7 +568,22 @@ export class OrchestratorModule implements IOrchestratorModule {
                   },
                   onError: {
                     target: "#ETL-error",
-                    actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                    actions: [
+                      () =>
+                        this.logger.log(
+                          "Error global step pipe",
+                          "error",
+                          "global-step-pipe",
+                          this.id
+                        ),
+                      ({ event }) =>
+                        this.notify({
+                          message: "Error global step pipe",
+                          type: "error",
+                          details: (event.error as Error).toString(),
+                        }),
+                      assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+                    ],
                   },
                 },
               },
@@ -552,12 +603,17 @@ export class OrchestratorModule implements IOrchestratorModule {
             exit: assign({ editingRow: () => null }),
             onDone: {
               target: "waiting-user",
+              actions: [
+                () => this.notify({ message: "Successfully edited row", type: "info" }),
+                () => this.logger.log("Successfully edited row", "info", "editing-row", this.id),
+              ],
             },
           },
           "removing-row": {
             entry: [
               () => this.logger.log("Removing row...", "info", "removing-row", this.id),
               assign({ processingRows: true }),
+              () => this.notify({ message: "Removing row...", type: "info" }),
             ],
             invoke: {
               id: "removing-row",
@@ -565,13 +621,27 @@ export class OrchestratorModule implements IOrchestratorModule {
               input: ({ context }) => ({ removingRow: context.removingRow }),
               onDone: {
                 target: "initializing-user-view",
-                actions: assign({ processingRows: false }),
+                actions: [
+                  assign({ processingRows: false }),
+                  () => this.notify({ message: "Successfully removed row", type: "info" }),
+                  () =>
+                    this.logger.log("Successfully removed row", "info", "removing-row", this.id),
+                ],
               },
               onError: {
                 target: "error",
-                actions: assign(({ event }) => ({
-                  unexpectedError: (event.error as Error).toString(),
-                })),
+                actions: [
+                  () => this.logger.log("Error removing row", "error", "removing-row", this.id),
+                  ({ event }) =>
+                    this.notify({
+                      message: "Error removing row",
+                      type: "error",
+                      details: (event.error as Error).toString(),
+                    }),
+                  assign(({ event }) => ({
+                    unexpectedError: (event.error as Error).toString(),
+                  })),
+                ],
               },
             },
             exit: assign({ removingRow: () => null }),
@@ -579,18 +649,30 @@ export class OrchestratorModule implements IOrchestratorModule {
           exporting: {
             entry: () => {
               this.logger.log("Exporting data...", "info", "exporting", this.id);
+              this.notify({ message: "Exporting data...", type: "info" });
             },
             invoke: {
               src: "exporting",
               input: ({ context }) => ({ exporting: context.exporting, layout: context.layout }),
               onDone: {
                 target: "waiting-user",
+                actions: [
+                  () => this.notify({ message: "Successfully exported data", type: "info" }),
+                ],
               },
               onError: {
                 target: "error",
-                actions: assign(({ event }) => ({
-                  unexpectedError: (event.error as Error).toString(),
-                })),
+                actions: [
+                  ({ event }) =>
+                    this.notify({
+                      message: "Error exporting data",
+                      type: "error",
+                      details: (event.error as Error).toString(),
+                    }),
+                  assign(({ event }) => ({
+                    unexpectedError: (event.error as Error).toString(),
+                  })),
+                ],
               },
             },
             exit: assign({ exporting: () => null }),
@@ -599,6 +681,11 @@ export class OrchestratorModule implements IOrchestratorModule {
             id: "ETL-error",
             entry: () => {
               this.logger.log("Proccess failed...", "error", "error", this.id);
+              this.notify({
+                message: "Proccess failed...",
+                type: "error",
+                details: "Unexpected error",
+              });
             },
             on: {
               RESET: {
@@ -805,6 +892,18 @@ export class OrchestratorModule implements IOrchestratorModule {
     this.metrics$ = this.metricsSubject.asObservable();
 
     this.logger.log("Orchestrator started", "info", "start", this.id);
+  };
+
+  private notify = (notification: Partial<Notification>) => {
+    const _notification: Notification = {
+      type: "info",
+      message: "",
+      details: "",
+      timestamp: new Date(),
+      ...notification,
+    };
+
+    this.notificationSubject.next(_notification);
   };
 
   public cleanPersistence = () => {

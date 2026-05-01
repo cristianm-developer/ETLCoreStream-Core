@@ -3,8 +3,8 @@ import type { OrchestratorStateType } from "./schemes/orchestrator-states";
 import type { LayoutBase } from "@/shared/schemes/layout-base";
 import type { Log } from "@/shared/schemes/log";
 import type { Observable } from "rxjs";
-import type { Signal } from "@preact/signals-core";
 import type { ProviderModule } from "../provider/main";
+import type { Notification } from "@/shared/schemes/notification";
 
 export interface IOrchestratorModule {
   initialize(provider: ProviderModule, id?: string): void;
@@ -22,7 +22,7 @@ export interface IOrchestratorModule {
   logs$: Observable<Log>;
   layout$: Observable<LayoutBase | null>;
   file$: Observable<File | null>;
-  notification$: Observable<Notification>;
+  notification$: Observable<Notification | null>;
 
   //handler for signals access
   layout: LayoutBase;
