@@ -1,7 +1,6 @@
 import type { LayoutBase } from "@/shared/schemes/layout-base";
 import type { RowObject } from "@/shared/schemes/row-object";
 import type { ValidationError } from "@/shared/schemes/local-step-validators";
-import type { Signal } from "@preact/signals-core";
 
 export type LocalStepsEngineModuleOptions = {
   maxErrorCount?: number;

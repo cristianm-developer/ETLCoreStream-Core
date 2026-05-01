@@ -28,7 +28,6 @@ export class MappingModule implements IMappingModule {
     this.logger.log("MappingModule initialized", "debug", "constructor", this.id);
   }
 
-
   handleStream = async (
     stream: ReadableStream,
     layout: LayoutBase,

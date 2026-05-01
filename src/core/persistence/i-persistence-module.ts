@@ -2,7 +2,6 @@ import type { ValidationError } from "@/shared/schemes/local-step-validators";
 import type { RowFilter } from "@/shared/schemes/persistent-filter";
 import type { RowObject } from "@/shared/schemes/row-object";
 import type { FileMetrics } from "@/shared/schemes/file-metrics";
-import type { Signal } from "@preact/signals-core";
 
 export type PersistenceModuleOptions = {
   chunkSizeQtd?: number;

@@ -58,7 +58,8 @@ export class OrchestratorModule implements IOrchestratorModule {
   get progress() {
     return this.progressSignal.value;
   }
-  private stateSignal: Signal<OrchestratorStateType> = signal<OrchestratorStateType>("initializing");
+  private stateSignal: Signal<OrchestratorStateType> =
+    signal<OrchestratorStateType>("initializing");
   get state() {
     return this.stateSignal.value;
   }
@@ -76,7 +77,7 @@ export class OrchestratorModule implements IOrchestratorModule {
   get context() {
     return this.contextSignal.value;
   }
-  
+
   metrics$!: Observable<OrchestratorContext["metrics"]>;
   context$!: Observable<OrchestratorContext>;
   state$!: Observable<OrchestratorStateType>;
@@ -86,8 +87,15 @@ export class OrchestratorModule implements IOrchestratorModule {
   private fileSubject: BehaviorSubject<File | null> = new BehaviorSubject<File | null>(null);
 
   private subscriptions = new Subscription();
+  
+  private layoutSignal: Signal<LayoutBase | null> = signal<LayoutBase | null>(null);
+  get layout() {
+    return this.layoutSignal.value;
+  }
 
-  getLayout!: () => LayoutBase | null;
+  private layoutSubject: BehaviorSubject<LayoutBase | null> = new BehaviorSubject<LayoutBase | null>(null);
+  layout$!: Observable<LayoutBase | null>;
+
 
   getId = (): string => this.id;
   getCurrentState = (): string => {
@@ -124,7 +132,6 @@ export class OrchestratorModule implements IOrchestratorModule {
     this.start();
   };
 
-
   private progressSignal = computed(() => {
     const modules = this.provider.modules;
     const allProgress = [
@@ -133,10 +140,10 @@ export class OrchestratorModule implements IOrchestratorModule {
       { label: "handling-local-step", value: modules.localStepEngine.progress },
       { label: "persisting", value: modules.persistence.progress },
       { label: "handle-global-steps", value: modules.globalStepEngine.progress },
-    ]
+    ];
 
     return allProgress.filter((e) => e.value !== null);
-  })
+  });
 
   private createMachine = () => {
     if (this.actor) return;
@@ -857,6 +864,18 @@ export class OrchestratorModule implements IOrchestratorModule {
         .subscribe((val) => {
           this.contextSubject.next(val);
           this.contextSignal.value = val;
+        })
+    );
+
+    this.subscriptions.add(
+      snapshot$
+        .pipe(
+          map((s) => s.context.layout ?? null),
+          distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
+        )
+        .subscribe((val) => {
+          this.layoutSubject.next(val);
+          this.layoutSignal.value = val;
         })
     );
 

@@ -1,6 +1,5 @@
 import type { LayoutBase } from "@/shared/schemes/layout-base";
 import type { LayoutHeader } from "@/shared/schemes/layout-header";
-import type { Signal } from "@preact/signals-core";
 
 export type MappingModuleOptions = {
   allowRemapColumns: boolean;

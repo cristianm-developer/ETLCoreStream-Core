@@ -9,9 +9,6 @@ import type { ProviderModule } from "../provider/main";
 export interface IOrchestratorModule {
   initialize(provider: ProviderModule, id?: string): void;
 
-  /* layout management */
-  getLayout: () => LayoutBase | null;
-
   /* identity / state / context */
   getId(): string;
   getCurrentState(): string;
@@ -23,9 +20,10 @@ export interface IOrchestratorModule {
   context$: Observable<OrchestratorContext>;
   metrics$: Observable<OrchestratorContext["metrics"]>;
   logs$: Observable<Log>;
-  file$: Observable<File | null>;  
+  file$: Observable<File | null>;
 
   //handler for signals access
+  layout: LayoutBase;
   state: OrchestratorStateType;
   metrics: OrchestratorContext["metrics"];
   progress: { label: string; value: number | null }[];

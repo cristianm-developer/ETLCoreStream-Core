@@ -28,7 +28,7 @@ export class ImportFilePapaparseModule implements IImportFileModule {
     this.logger = logger;
     this.config = { ...DEFAULT_IMPORT_FILE_MODULE_OPTIONS, ...config };
 
-    if(!isWorkerSupported()) {
+    if (!isWorkerSupported()) {
       this.config.worker = false;
     }
 

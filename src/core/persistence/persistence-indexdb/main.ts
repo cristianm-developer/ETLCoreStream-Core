@@ -51,7 +51,7 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
         if (!db.objectStoreNames.contains(this.options.storeNames.rows)) {
           db.createObjectStore(this.options.storeNames.rows, {
             keyPath: this.options.storeKeys.rows,
-          }); 
+          });
         }
         if (!db.objectStoreNames.contains(this.options.storeNames.errors)) {
           db.createObjectStore(this.options.storeNames.errors, {
