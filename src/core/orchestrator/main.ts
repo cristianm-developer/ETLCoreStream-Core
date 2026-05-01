@@ -11,7 +11,6 @@ import { assign, createActor, createMachine, fromPromise } from "xstate";
 import type { Signal } from "@preact/signals-core";
 import { computed, signal } from "@preact/signals-core";
 import type { OrchestratorEvent } from "./schemes/orchestrator-event";
-import type { RowObject } from "@/shared/schemes/row-object";
 import type { IOrchestratorModule } from "./i-orchestrator-module";
 import type { Notification } from "@/shared/schemes/notification";
 
