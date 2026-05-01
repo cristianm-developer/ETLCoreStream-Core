@@ -87,15 +87,15 @@ export class OrchestratorModule implements IOrchestratorModule {
   private fileSubject: BehaviorSubject<File | null> = new BehaviorSubject<File | null>(null);
 
   private subscriptions = new Subscription();
-  
+
   private layoutSignal: Signal<LayoutBase | null> = signal<LayoutBase | null>(null);
   get layout() {
     return this.layoutSignal.value;
   }
 
-  private layoutSubject: BehaviorSubject<LayoutBase | null> = new BehaviorSubject<LayoutBase | null>(null);
+  private layoutSubject: BehaviorSubject<LayoutBase | null> =
+    new BehaviorSubject<LayoutBase | null>(null);
   layout$!: Observable<LayoutBase | null>;
-
 
   getId = (): string => this.id;
   getCurrentState = (): string => {
@@ -859,7 +859,11 @@ export class OrchestratorModule implements IOrchestratorModule {
       snapshot$
         .pipe(
           map((s) => s.context as OrchestratorContext),
-          distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
+          distinctUntilChanged(
+            (prev, curr) =>
+              JSON.stringify({ ...prev, activeStream: undefined }) ===
+              JSON.stringify({ ...curr, activeStream: undefined })
+          )
         )
         .subscribe((val) => {
           this.contextSubject.next(val);
