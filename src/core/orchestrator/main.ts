@@ -851,12 +851,12 @@ export class OrchestratorModule implements IOrchestratorModule {
 
             const exportingInput = input as {
               layout: LayoutBase;
-              exporting: {id: string; target: "Stream" | "File"};
+              exporting: { id: string; target: "Stream" | "File" };
             };
 
             const exportKey = exportingInput.exporting.id;
             const exportObj = exportingInput.layout.exports.find((e) => e.name === exportKey);
-            
+
             if (!exportObj?.fn) {
               throw new Error(`Export function not found for key: ${exportKey}`);
             }

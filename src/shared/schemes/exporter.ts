@@ -1,6 +1,5 @@
 import { RowObject } from "./row-object";
 
-
 export type Exporter = {
   name: string;
   description: string;
