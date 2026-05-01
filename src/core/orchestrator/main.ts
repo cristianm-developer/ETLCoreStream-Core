@@ -850,20 +850,13 @@ export class OrchestratorModule implements IOrchestratorModule {
             const persistence = this.provider.modules.persistence;
 
             const exportingInput = input as {
-              exporting: {
-                id: string;
-                target: "Stream" | "File";
-                callback: (stream: ReadableStream) => Promise<void>;
-              };
               layout: LayoutBase;
-            };
-            const exportKey = exportingInput.exporting.id;
-            const exportObj = input.layout.exports[exportKey] as {
-              fn: (row: RowObject) => any;
-              labelDicc?: Record<string, string>;
-              callback?: (stream: ReadableStream) => Promise<void>;
+              exporting: {id: string; target: "Stream" | "File"};
             };
 
+            const exportKey = exportingInput.exporting.id;
+            const exportObj = exportingInput.layout.exports.find((e) => e.name === exportKey);
+            
             if (!exportObj?.fn) {
               throw new Error(`Export function not found for key: ${exportKey}`);
             }

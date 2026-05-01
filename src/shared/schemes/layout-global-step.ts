@@ -4,6 +4,7 @@ import type { ErrorFilter, RowFilter } from "./persistent-filter";
 
 export type GlobalStep = {
   name: string;
+  description: string;
   order: "transforms" | "validators"[];
   reprocessAllRowsOnChange: boolean;
   filter: {
