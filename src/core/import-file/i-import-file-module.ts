@@ -36,4 +36,5 @@ export interface StreamResult {
 export interface IImportFileModule {
   readFileStream: (file: File, signal?: AbortSignal) => [ReadableStream, Signal<number | null>];
   progress: number;
+  updateOptions(options: Partial<ImportFileModuleOptions>): void;
 }

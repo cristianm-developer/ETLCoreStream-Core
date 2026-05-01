@@ -34,4 +34,5 @@ export interface ILoggerModule {
   ) => Log[];
 
   restartLogs: () => void;
+  updateOptions(options: Partial<LoggerModuleOptions>): void;
 }

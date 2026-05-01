@@ -30,6 +30,8 @@ describe("MappingModule", () => {
     name: "Test Layout",
     description: "A test layout",
     localSteps: [],
+    globalSteps: [],
+    exports: {},
     allowUndefinedColumns: false,
     headers: [
       createMockLayoutHeader({ key: "name", required: true }),
@@ -651,67 +653,6 @@ describe("MappingModule", () => {
     });
   });
 
-  describe("handleAbortSignal", () => {
-    it("should throw error when abort signal is aborted", () => {
-      const controller = new AbortController();
-      controller.abort();
-
-      expect(() => {
-        mappingModule.handleAbortSignal(controller.signal, "test-step", "test-id");
-      }).toThrow("Mapping Error: Abort signal received");
-    });
-
-    it("should not throw error when abort signal is not aborted", () => {
-      const controller = new AbortController();
-
-      expect(() => {
-        mappingModule.handleAbortSignal(controller.signal, "test-step", "test-id");
-      }).not.toThrow();
-    });
-
-    it("should log abort signal when it is aborted", () => {
-      const controller = new AbortController();
-      controller.abort();
-
-      try {
-        mappingModule.handleAbortSignal(controller.signal, "abort-step", "abort-id");
-      } catch (error) {
-        // Expected error
-      }
-
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        "Abort signal received",
-        "debug",
-        "abort-step",
-        "abort-id"
-      );
-    });
-
-    it("should not throw when abort signal is undefined", () => {
-      expect(() => {
-        mappingModule.handleAbortSignal(undefined, "test-step", "test-id");
-      }).not.toThrow();
-    });
-
-    it("should use default parameters when not provided", () => {
-      const controller = new AbortController();
-      controller.abort();
-
-      try {
-        mappingModule.handleAbortSignal(controller.signal);
-      } catch (error) {
-        // Expected error
-      }
-
-      expect(mockLogger.log).toHaveBeenCalledWith(
-        "Abort signal received",
-        "debug",
-        "mapping",
-        "mapping-native"
-      );
-    });
-  });
-
   describe("Abort signal integration", () => {
     it("should abort handleRemap when abort signal is received", async () => {
       const layout = createMockLayout();
@@ -741,9 +682,9 @@ describe("MappingModule", () => {
         duplicatedHeaders: [],
       });
 
-      await expect(customModule.handleRemap(layout, row, controller.signal)).rejects.toThrow(
-        "Mapping Error: Abort signal received"
-      );
+      await expect(customModule.handleRemap(layout, row, controller.signal)).rejects.toMatchObject({
+        name: "AbortError",
+      });
     });
 
     it("should abort stream transformation when abort signal is received", async () => {
@@ -847,9 +788,9 @@ describe("MappingModule", () => {
         duplicatedHeaders: [],
       });
 
-      await expect(customModule.handleRemap(layout, row, controller.signal)).rejects.toThrow(
-        "Mapping Error: Abort signal received"
-      );
+      await expect(customModule.handleRemap(layout, row, controller.signal)).rejects.toMatchObject({
+        name: "AbortError",
+      });
     });
   });
 

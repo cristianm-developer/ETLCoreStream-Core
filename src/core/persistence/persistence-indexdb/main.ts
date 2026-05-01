@@ -635,4 +635,8 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
       };
     });
   };
+
+  updateOptions(options: Partial<PersistenceModuleOptions>): void {
+    this.options = { ...this.options, ...options };
+  }
 }

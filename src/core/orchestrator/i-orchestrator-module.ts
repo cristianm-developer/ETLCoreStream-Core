@@ -54,6 +54,8 @@ export interface IOrchestratorModule {
   export(id: string, target: "Stream" | "File"): void;
   editRow(rowId: number, key: string, value: string): void;
 
+  updateConfig(module: string, options: any): void;
+
   /* utilities */
   cleanPersistence(): void;
 }

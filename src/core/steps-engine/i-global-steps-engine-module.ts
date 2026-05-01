@@ -12,4 +12,5 @@ export interface IGlobalStepsEngineModule {
     totalRowsEstimated: number | null,
     signal?: AbortSignal
   ) => ReadableStream<{ rows: RowObject[]; errors: ValidationError[]; removedErrors: number[] }>;
+  updateOptions(options: Partial<GlobalStepsEngineModuleOptions>): void;
 }

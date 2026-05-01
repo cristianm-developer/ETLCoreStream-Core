@@ -84,6 +84,10 @@ export class LoggerModule implements ILoggerModule {
 
   restartLogs: () => void = () => (this.logs = []);
 
+  updateOptions(options: Partial<LoggerModuleOptions>): void {
+    this.config = { ...this.config, ...options };
+  }
+
   constructor(config: LoggerModuleOptions = {}) {
     this.config = config;
   }

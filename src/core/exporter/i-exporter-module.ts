@@ -49,4 +49,6 @@ export interface IExporterModule {
     }) => void,
     signal?: AbortSignal
   ) => Promise<void>;
+
+  updateOptions(options: Partial<ExporterModuleOptions>): void;
 }

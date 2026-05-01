@@ -349,4 +349,8 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
       };
     }
   };
+
+  updateOptions(options: Partial<LocalStepsEngineModuleOptions>): void {
+    this.options = { ...this.options, ...options };
+  }
 }

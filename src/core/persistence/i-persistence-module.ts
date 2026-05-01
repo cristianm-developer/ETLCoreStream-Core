@@ -57,4 +57,5 @@ export interface IPersistenceModule {
 
   updateMetrics: () => Promise<void>;
   getMetrics: () => Promise<FileMetrics | undefined>;
+  updateOptions(options: Partial<PersistenceModuleOptions>): void;
 }

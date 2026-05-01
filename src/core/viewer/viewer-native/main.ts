@@ -173,4 +173,8 @@ export class ViewerModule implements IViewerModule {
       throw error;
     }
   };
+
+  updateOptions(options: Partial<ViewerModuleOptions>): void {
+    this.options = { ...this.options, ...options };
+  }
 }

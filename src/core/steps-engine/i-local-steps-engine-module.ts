@@ -29,4 +29,5 @@ export interface ILocalStepsEngineModule {
     step?: string,
     order?: number
   ) => Promise<ReadableStream>;
+  updateOptions(options: Partial<LocalStepsEngineModuleOptions>): void;
 }

@@ -50,4 +50,5 @@ export interface IViewerModule {
     signal?: AbortSignal
   ) => Promise<void>;
   getTotalPages: (totalRows: number) => number;
+  updateOptions(options: Partial<ViewerModuleOptions>): void;
 }

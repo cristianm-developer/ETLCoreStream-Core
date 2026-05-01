@@ -62,7 +62,7 @@ export class MappingModule implements IMappingModule {
           const mapLen = columnMapEntries.length;
 
           for (let i = 0; i < rowCount; i++) {
-            this.handleAbortSignal(signal, step, this.id);
+            signal?.throwIfAborted();
 
             const row = rows[i];
             const mapped: { [key: string]: any } = {};
@@ -140,7 +140,7 @@ export class MappingModule implements IMappingModule {
 
         while (!mapValue && attemps < 3) {
           attemps++;
-          this.handleAbortSignal(signal, "handleRemap", this.id);
+          signal?.throwIfAborted();
           const result = await this.options.onRemapFn?.(rowKeys, layout.headers);
           if (result) {
             mapValue = result;
@@ -191,14 +191,7 @@ export class MappingModule implements IMappingModule {
     return mapEntries;
   };
 
-  handleAbortSignal = (
-    abortSignal?: AbortSignal,
-    step: string = "mapping",
-    id: string = "mapping-native"
-  ) => {
-    if (abortSignal?.aborted) {
-      this.logger.log("Abort signal received", "debug", step, id);
-      throw new Error("Mapping Error: Abort signal received");
-    }
-  };
+  updateOptions(options: Partial<MappingModuleOptions>): void {
+    this.options = { ...this.options, ...options };
+  }
 }

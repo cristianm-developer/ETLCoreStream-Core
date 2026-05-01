@@ -85,7 +85,7 @@ export class ImportFilePapaparseModule implements IImportFileModule {
           dynamicTyping: false,
           skipEmptyLines: true,
           chunk: (results, parser) => {
-            handleAbortSignal(signal, "createDataStream", this.id);
+            signal?.throwIfAborted();
             parserInstance = parser;
 
             const bytesRead = results.meta.cursor;
@@ -158,7 +158,7 @@ export class ImportFilePapaparseModule implements IImportFileModule {
         });
       },
       pull: (controller) => {
-        handleAbortSignal(signal, "createDataStream", this.id);
+        signal?.throwIfAborted();
         if (parserInstance) {
           parserInstance.resume();
         }
@@ -170,14 +170,9 @@ export class ImportFilePapaparseModule implements IImportFileModule {
 
     return stream;
   }
+
+  updateOptions(options: Partial<ImportFileModuleOptions>): void {
+    this.config = { ...this.config, ...options };
+  }
 }
 
-const handleAbortSignal = (
-  signal?: AbortSignal,
-  step: string = "importFile-papaparse",
-  id: string = "importFile-papaparse"
-) => {
-  if (signal?.aborted) {
-    throw new Error("Abort signal received");
-  }
-};

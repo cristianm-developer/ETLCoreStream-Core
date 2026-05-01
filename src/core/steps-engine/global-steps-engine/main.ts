@@ -1,6 +1,6 @@
 import type { GlobalStep } from "@/shared/schemes/layout-global-step";
 import type { RowObject } from "@/shared/schemes/row-object";
-import type { IGlobalStepsEngineModule } from "../i-global-steps-engine-module";
+import type { GlobalStepsEngineModuleOptions, IGlobalStepsEngineModule } from "../i-global-steps-engine-module";
 import type { LoggerModule } from "@/core/logger/logger-native/main";
 import type { GlobalStepTransform } from "@/shared/schemes/global-step-transform";
 import type { GlobalStepValidator } from "@/shared/schemes/global-step-validator";
@@ -11,13 +11,16 @@ export class GlobalStepsEngineModule implements IGlobalStepsEngineModule {
   private id: string = "global-steps-engine";
   private logger: LoggerModule;
   private progressSignal = new Signal<number | null>(null);
+  private options: GlobalStepsEngineModuleOptions;
+  
   get progress() {
     return this.progressSignal.value;
   }
 
-  constructor(logger: LoggerModule) {
+  constructor(logger: LoggerModule, options: GlobalStepsEngineModuleOptions) {
     this.logger = logger;
     this.logger.log("GlobalStepsEngineModule initialized", "debug", "constructor", this.id);
+    this.options = options;
   }
 
   handleStep = (
@@ -111,5 +114,9 @@ export class GlobalStepsEngineModule implements IGlobalStepsEngineModule {
   ): Promise<void> {
     signal?.throwIfAborted();
     await transform.fn(rows, ...transform.args);
+  }
+
+  updateOptions(options: Partial<GlobalStepsEngineModuleOptions>): void {
+    this.options = { ...this.options, ...options };
   }
 }

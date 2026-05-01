@@ -28,4 +28,5 @@ export interface IMappingModule {
   ) => Promise<ReadableStream>;
 
   handleRemap: (layout: LayoutBase, row: any, signal?: AbortSignal) => Promise<[string, string][]>;
+  updateOptions(options: Partial<MappingModuleOptions>): void;
 }
