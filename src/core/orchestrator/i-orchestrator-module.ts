@@ -20,6 +20,7 @@ export interface IOrchestratorModule {
   context$: Observable<OrchestratorContext>;
   metrics$: Observable<OrchestratorContext["metrics"]>;
   logs$: Observable<Log>;
+  layout$: Observable<LayoutBase | null>;
   file$: Observable<File | null>;
 
   //handler for signals access
