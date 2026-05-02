@@ -80,6 +80,23 @@ export class OrchestratorModule implements IOrchestratorModule {
     return this.contextSignal.value;
   }
 
+  private viewPaginationInfoSignal: Signal<{
+    currentPage: number;
+    totalPages: number;
+    totalEstimatedRows: number;
+  }> = signal<{ currentPage: number; totalPages: number; totalEstimatedRows: number }>({
+    currentPage: 1,
+    totalPages: 0,
+    totalEstimatedRows: 0,
+  });
+  get viewPaginationInfo() {
+    return this.viewPaginationInfoSignal.value;
+  }
+  private viewFilterSignal: Signal<RowFilter | null> = signal<RowFilter | null>(null);
+  get viewFilter() {
+    return this.viewFilterSignal.value;
+  }
+
   metrics$: Observable<OrchestratorContext["metrics"]> = this.metricsSubject.asObservable();
   context$: Observable<OrchestratorContext> = this.contextSubject.asObservable();
   state$: Observable<OrchestratorStateType> = this.stateSubject.asObservable();
@@ -987,6 +1004,32 @@ export class OrchestratorModule implements IOrchestratorModule {
         .subscribe((val) => {
           this.layoutSubject.next(val);
           this.layoutSignal.value = val;
+        })
+    );
+
+    this.subscriptions.add(
+      snapshot$
+        .pipe(
+          map((s) => s.context.currentFilter ?? null),
+          distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
+        )
+        .subscribe((val) => {
+          this.viewFilterSignal.value = val;
+        })
+    );
+
+    this.subscriptions.add(
+      snapshot$
+        .pipe(
+          map((s) => ({
+            currentPage: s.context.currentPage ?? null,
+            totalPages: s.context.totalPages ?? 0,
+            totalEstimatedRows: s.context.totalEstimatedRows ?? 0,
+          })),
+          distinctUntilChanged((prev, curr) => prev === curr)
+        )
+        .subscribe((val) => {
+          this.viewPaginationInfoSignal.value = val;
         })
     );
 

@@ -33,6 +33,13 @@ export interface IOrchestratorModule {
   file: File | null;
   context: OrchestratorContext;
 
+  viewPaginationInfo: {
+    currentPage: number;
+    totalPages: number;
+    totalEstimatedRows: number;
+  };
+  viewFilter: RowFilter | null;
+
   /* helper to retrieve logs synchronously from the logger */
   getLogs(
     fromTime?: Date,
