@@ -525,7 +525,7 @@ describe("OrchestatorModule - State Machine", () => {
       it("should send CHANGE_PAGE event with correct pageNumber", async () => {
         await new Promise((resolve) => setTimeout(resolve, 100));
 
-        orchestrator.changePage(2);
+        orchestrator.changeViewPage(2);
 
         // Simplemente verifica que la máquina siga funcionando sin error
         await new Promise((resolve) => setTimeout(resolve, 400));
@@ -535,7 +535,7 @@ describe("OrchestatorModule - State Machine", () => {
 
       it("should transition back to initializing-user-view on page change", async () => {
         await new Promise((resolve) => setTimeout(resolve, 100));
-        orchestrator.changePage(3);
+        orchestrator.changeViewPage(3);
 
         await new Promise((resolve) => setTimeout(resolve, 400));
         const state = orchestrator.getCurrentState();

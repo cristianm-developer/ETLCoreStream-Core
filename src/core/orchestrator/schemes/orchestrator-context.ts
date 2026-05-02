@@ -19,6 +19,7 @@ export interface OrchestratorContext {
   currentRows: RowObject[] | null;
   currentErrors: ValidationError[] | null;
   currentPage: number;
+  currentFilter: RowFilter | null;
   totalPages: number;
   totalEstimatedRows: number | null;
   processingRows: boolean;

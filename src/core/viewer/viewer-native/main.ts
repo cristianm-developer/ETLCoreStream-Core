@@ -133,7 +133,7 @@ export class ViewerModule implements IViewerModule {
       signal?.throwIfAborted();
 
       row.value[headerKeyEdited] = newValue;
-      row.__sError = null;
+      row.__isError = null;
 
       await persistenceModule.updateRow(row);
       this.logger.log(`Row ${rowId} updated in persistence`, "debug", "editRow", this.id);

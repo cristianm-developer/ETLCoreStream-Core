@@ -234,7 +234,7 @@ describe("PersistenceIndexDbModule", () => {
   describe("rowMatchesFilter", () => {
     it("should exclude rows with errors when withErrors is true", () => {
       const filter: RowFilter = { withErrors: true };
-      const row = createMockRowObject({ __sError: null });
+      const row = createMockRowObject({ __isError: null });
 
       const result = (persistenceModule as any).rowMatchesFilter(row, filter);
       expect(result).toBe(false);
@@ -242,7 +242,7 @@ describe("PersistenceIndexDbModule", () => {
 
     it("should exclude rows without errors when withoutErrors is true", () => {
       const filter: RowFilter = { withoutErrors: true };
-      const row = createMockRowObject({ __sError: "ERROR_CODE" });
+      const row = createMockRowObject({ __isError: "ERROR_CODE" });
 
       const result = (persistenceModule as any).rowMatchesFilter(row, filter);
       expect(result).toBe(false);
@@ -250,7 +250,7 @@ describe("PersistenceIndexDbModule", () => {
 
     it("should match rows with errors when withErrors is true and __sError is not null", () => {
       const filter: RowFilter = { withErrors: true };
-      const row = createMockRowObject({ __sError: "ERROR_CODE" });
+      const row = createMockRowObject({ __isError: "ERROR_CODE" });
 
       const result = (persistenceModule as any).rowMatchesFilter(row, filter);
       expect(result).toBe(true);
@@ -258,7 +258,7 @@ describe("PersistenceIndexDbModule", () => {
 
     it("should match rows without errors when withoutErrors is true and __sError is null", () => {
       const filter: RowFilter = { withoutErrors: true };
-      const row = createMockRowObject({ __sError: null });
+      const row = createMockRowObject({ __isError: null });
 
       const result = (persistenceModule as any).rowMatchesFilter(row, filter);
       expect(result).toBe(true);

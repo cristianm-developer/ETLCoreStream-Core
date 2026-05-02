@@ -54,7 +54,7 @@ describe("GlobalStepsEngineModule", () => {
 
   const createMockRowObject = (overrides?: Partial<RowObject>): RowObject => ({
     __rowId: 1,
-    __sError: null,
+    __isError: null,
     __originalValue: JSON.stringify({ name: "John" }),
     value: { name: "john" },
     ...overrides,
@@ -241,8 +241,8 @@ describe("GlobalStepsEngineModule", () => {
         validators: [createMockValidator({ fn: validatorFn })],
       });
 
-      const rowOk = createMockRowObject({ __rowId: 1, __sError: null });
-      const rowErr = createMockRowObject({ __rowId: 2, __sError: "x" });
+      const rowOk = createMockRowObject({ __rowId: 1, __isError: null });
+      const rowErr = createMockRowObject({ __rowId: 2, __isError: "x" });
       await readAllFromHandleStep(stepsEngineModule, step, [[rowOk, rowErr]]);
 
       expect(transformFn).toHaveBeenCalledTimes(1);

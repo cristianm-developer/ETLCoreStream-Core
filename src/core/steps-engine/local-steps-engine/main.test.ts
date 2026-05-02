@@ -53,7 +53,7 @@ describe("LocalStepsEngineModule", () => {
     allowUndefinedColumns: false,
     headers: [],
     globalSteps: [],
-    exports: {},
+    exports: [],
     ...overrides,
   });
 
@@ -68,7 +68,7 @@ describe("LocalStepsEngineModule", () => {
 
   const createMockRowObject = (overrides?: Partial<RowObject>): RowObject => ({
     __rowId: 1,
-    __sError: null,
+    __isError: null,
     __originalValue: JSON.stringify({ name: "John" }),
     value: { name: "john" },
     ...overrides,
@@ -139,7 +139,7 @@ describe("LocalStepsEngineModule", () => {
       expect(capturedChunk.rows[0]).toEqual(
         expect.objectContaining({
           __rowId: 1,
-          __sError: null,
+          __isError: null,
         })
       );
     });
@@ -183,9 +183,9 @@ describe("LocalStepsEngineModule", () => {
       );
     });
 
-    it("should skip rows marked with __sError flag", async () => {
+    it("should skip rows marked with __isError flag", async () => {
       const layout = createMockLayout();
-      const errorRow = createMockRowObject({ __sError: "ERROR_CODE" });
+      const errorRow = createMockRowObject({ __isError: "ERROR_CODE" });
       let capturedChunk: any = null;
 
       const mockStream = new ReadableStream({
@@ -214,7 +214,7 @@ describe("LocalStepsEngineModule", () => {
         // Stream ended
       }
 
-      expect(capturedChunk.rows[0].__sError).toBe("ERROR_CODE");
+      expect(capturedChunk.rows[0].__isError).toBe("ERROR_CODE");
     });
 
     it("should throw error when max error count is reached", async () => {
@@ -333,7 +333,7 @@ describe("LocalStepsEngineModule", () => {
     });
 
     it("should skip step if row is marked as error", () => {
-      const row = createMockRowObject({ __sError: "ERROR_CODE" });
+      const row = createMockRowObject({ __isError: "ERROR_CODE" });
       const errorCount = { count: 0 };
       const errorDicc: Record<string, ValidationError> = {};
 
@@ -410,7 +410,7 @@ describe("LocalStepsEngineModule", () => {
 
       stepsEngineModule.executeValidators({ step, row, errorDicc, errorCount });
 
-      expect(row.__sError).toBe("INVALID_NAME");
+      expect(row.__isError).toBe("INVALID_NAME");
       expect(errorCount.count).toBe(1);
       expect(errorDicc[row.__rowId]).toBeDefined();
     });
@@ -467,7 +467,7 @@ describe("LocalStepsEngineModule", () => {
 
       stepsEngineModule.executeValidators({ step, row, errorDicc, errorCount });
 
-      expect(row.__sError).toBe(null);
+      expect(row.__isError).toBe(null);
       expect(errorCount.count).toBe(0);
     });
 
@@ -492,7 +492,7 @@ describe("LocalStepsEngineModule", () => {
         stepsEngineModule.executeValidators({ step, row, errorDicc, errorCount });
       }).toThrow();
 
-      expect(row.__sError).toBe("UNEXPECTED_ERROR - name:exceptionValidator");
+      expect(row.__isError).toBe("UNEXPECTED_ERROR - name:exceptionValidator");
       expect(errorCount.count).toBe(1);
     });
 
@@ -773,8 +773,8 @@ describe("LocalStepsEngineModule", () => {
       expect(result.error).toBe("Row is null or has error flag");
     });
 
-    it("should return error when row has __sError flag", async () => {
-      const row = createMockRowObject({ __sError: "EXISTING_ERROR" });
+    it("should return error when row has __isError flag", async () => {
+      const row = createMockRowObject({ __isError: "EXISTING_ERROR" });
       const layout = createMockLayout();
 
       const result = await stepsEngineModule.executeSingleRow(row, layout);

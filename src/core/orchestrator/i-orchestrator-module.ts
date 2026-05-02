@@ -5,6 +5,7 @@ import type { Log } from "@/shared/schemes/log";
 import type { Observable } from "rxjs";
 import type { ProviderModule } from "../provider/main";
 import type { Notification } from "@/shared/schemes/notification";
+import type { RowFilter } from "@/shared";
 
 export interface IOrchestratorModule {
   initialize(provider: ProviderModule, id?: string): void;
@@ -50,7 +51,9 @@ export interface IOrchestratorModule {
   /* actions available to consumers */
   selectFile(file: File): void;
   selectLayout(layout: LayoutBase): void;
-  changePage(pageNumber: number): void;
+
+  changeViewFilter(filter: RowFilter | null): void;
+  changeViewPage(pageNumber: number): void;
   removeRow(rowId: number): void;
   export(id: string, target: "Stream" | "File"): void;
   editRow(rowId: number, key: string, value: string): void;

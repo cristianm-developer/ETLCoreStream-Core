@@ -47,7 +47,7 @@ describe("ExporterNativeModule", () => {
 
   const createMockRowObject = (overrides?: Partial<RowObject>): RowObject => ({
     __rowId: 1,
-    __sError: null,
+    __isError: null,
     __originalValue: JSON.stringify({ id: "1", name: "John" }),
     value: { id: "1", name: "John" },
     ...overrides,

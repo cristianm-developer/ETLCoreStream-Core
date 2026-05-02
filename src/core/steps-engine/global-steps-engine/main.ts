@@ -69,7 +69,7 @@ export class GlobalStepsEngineModule implements IGlobalStepsEngineModule {
   ): Promise<{ rows: RowObject[]; errors: ValidationError[]; removedErrors: number[] }> {
     signal?.throwIfAborted();
 
-    const rowsWithoutErrors = rows.filter((row) => !row.__sError);
+    const rowsWithoutErrors = rows.filter((row) => !row.__isError);
 
     const errors: ValidationError[] = [];
     const removedErrors: number[] = [];

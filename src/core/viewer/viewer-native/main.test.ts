@@ -16,7 +16,7 @@ describe("ViewerModule", () => {
 
   const createMockRowObject = (overrides?: Partial<RowObject>): RowObject => ({
     __rowId: 1,
-    __sError: null,
+    __isError: null,
     __originalValue: "original_data",
     value: { name: "John", email: "john@test.com" },
     ...overrides,
@@ -352,13 +352,13 @@ describe("ViewerModule", () => {
         expect.objectContaining({
           __rowId: 1,
           value: { name: "Jane", email: "john@test.com" },
-          __sError: null,
+          __isError: null,
         })
       );
     });
 
     it("should clear error flag on edit", async () => {
-      const row = createMockRowObject({ __rowId: 1, __sError: "PREVIOUS_ERROR" });
+      const row = createMockRowObject({ __rowId: 1, __isError: "PREVIOUS_ERROR" });
       mockPersistenceModule.getRowById.mockResolvedValue(row);
 
       const payload: EditRowPayload = {
@@ -369,7 +369,7 @@ describe("ViewerModule", () => {
 
       await viewerModule.editRow(mockPersistenceModule, payload);
 
-      expect(row.__sError).toBe(null);
+      expect(row.__isError).toBe(null);
     });
 
     it("should throw error if row not found", async () => {
@@ -614,7 +614,7 @@ describe("ViewerModule", () => {
       await viewerModule.editRow(mockPersistenceModule, editPayload);
 
       expect(row.value.status).toBe("completed");
-      expect(row.__sError).toBeNull();
+      expect(row.__isError).toBeNull();
     });
   });
 });

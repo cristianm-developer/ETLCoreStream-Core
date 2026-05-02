@@ -142,7 +142,7 @@ export const ExportWithValidation = {
     email: row.value.email,
     phone: row.value.phone,
     country: row.value.country,
-    hasError: row.__sError ? true : false,
+    hasError: row.__isError ? true : false,
     rowId: row.__rowId,
   }),
   labelDicc: {

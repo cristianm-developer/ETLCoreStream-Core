@@ -1,4 +1,4 @@
-import { RowObject } from "./row-object";
+import type { RowObject } from "./row-object";
 
 export type Exporter = {
   name: string;

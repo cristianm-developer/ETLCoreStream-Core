@@ -62,7 +62,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
 
             this.progressSignal.value = Math.round((totalRowsProcessed / totalRowEstimated) * 100);
 
-            if (row.__sError) {
+            if (row.__isError) {
               this.logger.log(
                 `Row ${row.__rowId} is error, skipping`,
                 "debug",
@@ -140,7 +140,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
       transforms: this.executeTransforms,
     };
 
-    if (row.__sError) {
+    if (row.__isError) {
       this.logger.log(
         `Row ${row.__rowId} is error, skipping step ${step.name}`,
         "debug",
@@ -201,7 +201,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
               originalValue: row.__originalValue?.[headerKey],
               step: step.name,
             };
-            row.__sError = result.validationCode;
+            row.__isError = result.validationCode;
             errorCount.count++;
             break;
           }
@@ -216,7 +216,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
             step: step.name,
           };
           errorCount.count++;
-          row.__sError = `UNEXPECTED_ERROR - ${validator.headerKey}:${validator.name}`;
+          row.__isError = `UNEXPECTED_ERROR - ${validator.headerKey}:${validator.name}`;
 
           this.logger.log(
             `Unexpected error in validator ${validator.headerKey}:${validator.name}`,
@@ -279,7 +279,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
     try {
       this.handleAbortSignal(signal);
 
-      if (!row || row.__sError) {
+      if (!row || row.__isError) {
         this.logger.log(
           `Cannot execute single row: row is null or has __sError`,
           "warn",
@@ -307,7 +307,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
       for (const step of steps) {
         this.handleAbortSignal(signal);
 
-        if (row.__sError) {
+        if (row.__isError) {
           this.logger.log(
             `Row ${row.__rowId} marked as error, stopping step execution`,
             "debug",

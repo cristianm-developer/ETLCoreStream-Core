@@ -13,6 +13,7 @@ import { computed, signal } from "@preact/signals-core";
 import type { OrchestratorEvent } from "./schemes/orchestrator-event";
 import type { IOrchestratorModule } from "./i-orchestrator-module";
 import type { Notification } from "@/shared/schemes/notification";
+import type { RowFilter } from "@/shared";
 
 const DEFAULT_CONTEXT: OrchestratorContext = {
   file: null,
@@ -31,6 +32,7 @@ const DEFAULT_CONTEXT: OrchestratorContext = {
   totalPages: 0,
   totalEstimatedRows: 0,
   processingRows: false,
+  currentFilter: null,
 };
 
 export class OrchestratorModule implements IOrchestratorModule {
@@ -134,6 +136,12 @@ export class OrchestratorModule implements IOrchestratorModule {
     this.logs$ = this.logger.logs$;
     this.createMachine();
     this.start();
+  };
+
+  changeViewFilter = (filter: RowFilter | null): void => {
+    if (this.actor) {
+      this.actor.send({ type: "CHANGE_VIEW_FILTER", filter });
+    }
   };
 
   private progressSignal = computed(() => {
@@ -449,6 +457,10 @@ export class OrchestratorModule implements IOrchestratorModule {
                     target: event.target as "Stream" | "File",
                   }),
                 }),
+              },
+              CHANGE_VIEW_FILTER: {
+                target: "initializing-user-view",
+                actions: assign({ currentFilter: ({ event }) => event.filter }),
               },
             },
           },
@@ -784,7 +796,7 @@ export class OrchestratorModule implements IOrchestratorModule {
             const rowsData = await viewer.getRowsWithPagination(
               persistence,
               input.metrics,
-              input.layout.filter,
+              input.currentFilter,
               input.pageNumber ?? 1,
               signal
             );
@@ -1010,7 +1022,7 @@ export class OrchestratorModule implements IOrchestratorModule {
     this.actor?.send({ type: "LAYOUT_SELECTED", layout });
   };
 
-  public changePage = (pageNumber: number) => {
+  public changeViewPage = (pageNumber: number) => {
     this.actor?.send({ type: "CHANGE_PAGE", pageNumber });
   };
 

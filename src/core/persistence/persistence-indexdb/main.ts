@@ -251,8 +251,8 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
   }
 
   private rowMatchesFilter = (row: RowObject, filter: RowFilter) => {
-    if (filter.withErrors == true && !row.__sError) return false;
-    if (filter.withoutErrors == true && row.__sError) return false;
+    if (filter.withErrors == true && !row.__isError) return false;
+    if (filter.withoutErrors == true && row.__isError) return false;
 
     if (filter.fields && filter.fields.length > 0) {
       for (const fieldFilter of filter.fields) {
