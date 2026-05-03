@@ -5,7 +5,7 @@ import type { Log } from "@/shared/schemes/log";
 import type { Observable } from "rxjs";
 import type { ProviderModule } from "../provider/main";
 import type { Notification } from "@/shared/schemes/notification";
-import type { RowFilter } from "@/shared";
+import type { RowFilter, RowObject, ValidationError } from "@/shared";
 
 export interface IOrchestratorModule {
   initialize(provider: ProviderModule, id?: string): void;
@@ -32,6 +32,9 @@ export interface IOrchestratorModule {
   progress: { label: string; value: number | null }[];
   file: File | null;
   context: OrchestratorContext;
+
+  currentRows: RowObject[] | null;
+  currentErrors: ValidationError[] | null;
 
   viewPaginationInfo: {
     currentPage: number;

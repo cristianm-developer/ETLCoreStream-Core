@@ -1,19 +1,19 @@
 import type { LayoutBase } from "@/shared/schemes/layout-base";
-import type { ILoggerModule } from "../logger/i-logger-module";
-import type { ProviderModule } from "../provider/main";
-import type { OrchestratorContext } from "./schemes/orchestrator-context";
+import type { ILoggerModule } from "../../logger/i-logger-module";
+import type { ProviderModule } from "../../provider/main";
+import type { OrchestratorContext } from "../schemes/orchestrator-context";
 import type { Observable } from "rxjs";
 import { BehaviorSubject, distinctUntilChanged, from, map, Subscription } from "rxjs";
-import type { OrchestratorStateType } from "./schemes/orchestrator-states";
+import type { OrchestratorStateType } from "../schemes/orchestrator-states";
 import type { Log } from "@/shared/schemes/log";
 import type { ActorRefFrom } from "xstate";
 import { assign, createActor, createMachine, fromPromise } from "xstate";
 import type { Signal } from "@preact/signals-core";
 import { computed, signal } from "@preact/signals-core";
-import type { OrchestratorEvent } from "./schemes/orchestrator-event";
-import type { IOrchestratorModule } from "./i-orchestrator-module";
+import type { OrchestratorEvent } from "../schemes/orchestrator-event";
+import type { IOrchestratorModule } from "../i-orchestrator-module";
 import type { Notification } from "@/shared/schemes/notification";
-import type { RowFilter } from "@/shared";
+import type { RowFilter, RowObject, ValidationError } from "@/shared";
 
 const DEFAULT_CONTEXT: OrchestratorContext = {
   file: null,
@@ -119,6 +119,28 @@ export class OrchestratorModule implements IOrchestratorModule {
   private notificationSubject: BehaviorSubject<Notification | null> =
     new BehaviorSubject<Notification | null>(null);
   notification$: Observable<Notification | null> = this.notificationSubject.asObservable();
+
+  private currentRowsSubject: BehaviorSubject<RowObject[] | null> = new BehaviorSubject<
+    RowObject[] | null
+  >(null);
+  currentRows$: Observable<RowObject[] | null> = this.currentRowsSubject.asObservable();
+
+  private currentRowsSignal: Signal<RowObject[] | null> = signal<RowObject[] | null>(null);
+  get currentRows() {
+    return this.currentRowsSignal.value;
+  }
+
+  private currentErrorsSubject: BehaviorSubject<ValidationError[] | null> = new BehaviorSubject<
+    ValidationError[] | null
+  >(null);
+  currentErrors$: Observable<ValidationError[] | null> = this.currentErrorsSubject.asObservable();
+
+  private currentErrorsSignal: Signal<ValidationError[] | null> = signal<ValidationError[] | null>(
+    null
+  );
+  get currentErrors() {
+    return this.currentErrorsSignal.value;
+  }
 
   getId = (): string => this.id;
   getCurrentState = (): string => {
@@ -405,9 +427,15 @@ export class OrchestratorModule implements IOrchestratorModule {
                     metrics: context.metrics,
                     pageNumber: context.currentPage,
                   }),
-                  onDone: {
-                    target: "user-view-initialized",
-                  },
+                  onDone: [
+                    {
+                      target: "user-view-initialized",
+                      actions: assign({
+                        currentRows: ({ event }) => event.output.rows,
+                        currentErrors: ({ event }) => event.output.errors,
+                      }),
+                    },
+                  ],
                   onError: {
                     target: "#ETL-error",
                     actions: assign(({ event }) => ({ unexpectedError: event.error.toString() })),
@@ -817,6 +845,7 @@ export class OrchestratorModule implements IOrchestratorModule {
               input.pageNumber ?? 1,
               signal
             );
+
             return rowsData;
           }),
           editingData: fromPromise(async ({ input, signal }: any) => {
@@ -1030,6 +1059,30 @@ export class OrchestratorModule implements IOrchestratorModule {
         )
         .subscribe((val) => {
           this.viewPaginationInfoSignal.value = val;
+        })
+    );
+
+    this.subscriptions.add(
+      snapshot$
+        .pipe(
+          map((s) => s.context.currentRows ?? null),
+          distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
+        )
+        .subscribe((val) => {
+          this.currentRowsSubject.next(val);
+          this.currentRowsSignal.value = val;
+        })
+    );
+
+    this.subscriptions.add(
+      snapshot$
+        .pipe(
+          map((s) => s.context.currentErrors ?? null),
+          distinctUntilChanged((prev, curr) => JSON.stringify(prev) === JSON.stringify(curr))
+        )
+        .subscribe((val) => {
+          this.currentErrorsSubject.next(val);
+          this.currentErrorsSignal.value = val;
         })
     );
 

@@ -1,6 +1,6 @@
 {
   "name": "@etl-corestream/core",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "Headless ETL orchestration engine for the web. Process massive files with stream-friendly async operations, real-time validation/transformation, and jank-free performance using XState and Signals architecture.",
   "license": "ISC",
   "author": "Cristian Marin",

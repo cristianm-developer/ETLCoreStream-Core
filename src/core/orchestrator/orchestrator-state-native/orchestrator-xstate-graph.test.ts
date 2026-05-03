@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { OrchestratorModule } from "./main";
-import { ProviderModule } from "../provider/main";
-import { ILoggerModule } from "../logger/i-logger-module";
+import { ProviderModule } from "../../provider/main";
+import { ILoggerModule } from "../../logger/i-logger-module";
 import { LayoutBase } from "@/shared/schemes/layout-base";
 import { BehaviorSubject } from "rxjs";
 

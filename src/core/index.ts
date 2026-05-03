@@ -3,7 +3,7 @@ export type { IOrchestratorModule } from "./orchestrator/i-orchestrator-module";
 export type { OrchestratorContext as OrchestatorContext } from "./orchestrator/schemes/orchestrator-context";
 export type { OrchestratorStateType as OrchestatorStateType } from "./orchestrator/schemes/orchestrator-states";
 export type { OrchestratorEvent as OrchestatorEvent } from "./orchestrator/schemes/orchestrator-event";
-export { OrchestratorModule } from "./orchestrator/main";
+export { OrchestratorModule } from "./orchestrator/orchestrator-state-native/main";
 
 // Logger Module
 export type { ILoggerModule, LoggerModuleOptions } from "./logger/i-logger-module";

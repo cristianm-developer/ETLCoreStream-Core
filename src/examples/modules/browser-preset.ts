@@ -3,7 +3,7 @@ import { DEFAULT_IMPORT_FILE_MODULE_OPTIONS } from "@/core/import-file/i-import-
 import { ImportFilePapaparseModule } from "@/core/import-file/import-file-Papaparse/main";
 import { LoggerModule } from "@/core/logger/logger-native/main";
 import { DEFAULT_MAP_HEADERS_OPTIONS, MappingModule } from "@/core/mapping/mapping-native/main";
-import { OrchestratorModule } from "@/core/orchestrator/main";
+import { OrchestratorModule } from "@/core/orchestrator/orchestrator-state-native/main";
 import { DEFAULT_PERSISTENCE_MODULE_OPTIONS } from "@/core/persistence/i-persistence-module";
 import { PersistenceIndexDbModule } from "@/core/persistence/persistence-indexdb/main";
 import type { IProviderModuleConfig } from "@/core/provider/main";
