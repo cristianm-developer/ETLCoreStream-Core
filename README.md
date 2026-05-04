@@ -1,5 +1,7 @@
 # ETL CoreStream
 
+> **Disclaimer — under active development:** This library is still in heavy development and is **not** considered stable yet. Until **version 1.0** is released, APIs, behavior, and internal architecture may change without notice. You should anticipate **breaking, disruptive changes**—especially as the codebase converges toward a stable **v1**.
+
 ## Installation
 
 ```bash

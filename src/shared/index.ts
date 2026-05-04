@@ -12,3 +12,4 @@ export * from "./schemes/row-object";
 export * from "./schemes/layout-global-step";
 export * from "./schemes/layout-local-step";
 export * from "./schemes/notification";
+export * from "./schemes/exporter";
