@@ -299,6 +299,7 @@ export class OrchestratorModule implements IOrchestratorModule {
               }),
               onDone: {
                 target: "persisting",
+                actions: assign({ activeStream: ({ event }) => event.output }),
               },
               onError: {
                 target: "error",
@@ -322,6 +323,7 @@ export class OrchestratorModule implements IOrchestratorModule {
               }),
               onDone: {
                 target: "persisting",
+                actions: assign({ activeStream: ({ event }) => event.output }),
               },
               onError: {
                 target: "error",
@@ -767,7 +769,7 @@ export class OrchestratorModule implements IOrchestratorModule {
           }),
           mapping: fromPromise(async ({ input, signal }: any) => {
             const mapper = this.provider.modules.mapper;
-            return mapper.handleStream(
+            return await mapper.handleStream(
               input.activeStream,
               input.layout,
               input.totalEstimatedRows,
@@ -776,7 +778,7 @@ export class OrchestratorModule implements IOrchestratorModule {
           }),
           handlingLocalStep: fromPromise(async ({ input, signal }: any) => {
             const localStepEngine = this.provider.modules.localStepEngine;
-            return localStepEngine.handleStream(
+            return await localStepEngine.handleStream(
               input.activeStream,
               input.layout,
               input.totalEstimatedRows,
