@@ -7,7 +7,7 @@ import { BehaviorSubject, distinctUntilChanged, from, map, Subscription } from "
 import type { OrchestratorStateType } from "../schemes/orchestrator-states";
 import type { Log } from "@/shared/schemes/log";
 import type { ActorRefFrom } from "xstate";
-import { assign, createActor, createMachine, fromPromise } from "xstate";
+import { assign, createActor, createMachine, fromCallback, fromPromise } from "xstate";
 import type { Signal } from "@preact/signals-core";
 import { computed, signal } from "@preact/signals-core";
 import type { OrchestratorEvent } from "../schemes/orchestrator-event";
@@ -298,7 +298,7 @@ export class OrchestratorModule implements IOrchestratorModule {
                 totalEstimatedRows: context.totalEstimatedRows,
               }),
               onDone: {
-                target: "persisting",
+                target: "handling-local-step",
                 actions: assign({ activeStream: ({ event }) => event.output }),
               },
               onError: {
@@ -344,6 +344,12 @@ export class OrchestratorModule implements IOrchestratorModule {
                 activeStream: context.activeStream,
                 totalEstimatedRows: context.totalEstimatedRows,
               }),
+              onDone: {
+                actions: [
+                  () =>
+                    this.logger.log("Persisting data completed...", "info", "persisting", this.id),
+                ],
+              },
               onError: {
                 target: "error",
                 actions: assign(({ event }) => ({
@@ -354,6 +360,9 @@ export class OrchestratorModule implements IOrchestratorModule {
             on: {
               FIRST_CHUNK_RAW_READY: {
                 target: "handle-global-steps",
+                actions: [
+                  () => this.logger.log("First chunk raw ready...", "info", "persisting", this.id),
+                ],
               },
             },
           },
@@ -384,8 +393,9 @@ export class OrchestratorModule implements IOrchestratorModule {
               FIRST_CHUNK_PROCESSED_READY: {
                 target: "initializing-user-view",
               },
-              ALL_CHUNKS_PROCESSED: {
+              FINAL_PROCESSING_READY: {
                 target: "initializing-user-view",
+                actions: assign({ processingRows: false }),
               },
             },
           },
@@ -399,7 +409,7 @@ export class OrchestratorModule implements IOrchestratorModule {
                   this.id
                 ),
             ],
-            initial: "loading-rows",
+            initial: "loading-metrics",
             states: {
               "loading-metrics": {
                 entry: () => {
@@ -410,10 +420,27 @@ export class OrchestratorModule implements IOrchestratorModule {
                   src: "loadingMetrics",
                   input: ({ context }) => ({ layout: context.layout }),
                   onDone: {
-                    actions: assign({
-                      metrics: ({ event }) => event.output.metrics,
-                      totalPages: ({ event }) => event.output.totalPages,
-                    }),
+                    target: "loading-rows",
+                    actions: [
+                      () =>
+                        this.logger.log(
+                          "Metrics loading completed...",
+                          "info",
+                          "loading-metrics",
+                          this.id
+                        ),
+                      ({ event }) =>
+                        this.logger.log(
+                          "Metrics loaded..." + JSON.stringify(event.output.metrics),
+                          "debug",
+                          "loading-metrics",
+                          this.id
+                        ),
+                      assign({
+                        metrics: ({ event }) => event.output.metrics,
+                        totalPages: ({ event }) => event.output.totalPages,
+                      }),
+                    ],
                   },
                 },
               },
@@ -432,10 +459,13 @@ export class OrchestratorModule implements IOrchestratorModule {
                   onDone: [
                     {
                       target: "user-view-initialized",
-                      actions: assign({
-                        currentRows: ({ event }) => event.output.rows,
-                        currentErrors: ({ event }) => event.output.errors,
-                      }),
+                      actions: [
+                        () => this.logger.log("Rows loaded...", "info", "loading-rows", this.id),
+                        assign({
+                          currentRows: ({ event }) => event.output.rows,
+                          currentErrors: ({ event }) => event.output.errors,
+                        }),
+                      ],
                     },
                   ],
                   onError: {
@@ -449,7 +479,7 @@ export class OrchestratorModule implements IOrchestratorModule {
               },
             },
             onDone: {
-              target: "waiting-user",
+              target: "waiting-final-processing",
             },
           },
           "waiting-final-processing": {
@@ -682,8 +712,7 @@ export class OrchestratorModule implements IOrchestratorModule {
                 actions: [
                   assign({ processingRows: false }),
                   () => this.notify({ message: "Successfully removed row", type: "info" }),
-                  () =>
-                    this.logger.log("Successfully removed row", "info", "removing-row", this.id),
+                  () => this.logger.log("Successfully removed row", "info", "removing-row", this.id),
                 ],
               },
               onError: {
@@ -748,7 +777,10 @@ export class OrchestratorModule implements IOrchestratorModule {
             on: {
               RESET: {
                 target: "#ETL-initializing",
-                actions: assign(DEFAULT_CONTEXT),
+                actions: [
+                  assign(DEFAULT_CONTEXT),
+                  () => this.logger.log("Resetting orchestrator", "info", "reset", this.id),
+                ],
               },
             },
           },
@@ -756,7 +788,17 @@ export class OrchestratorModule implements IOrchestratorModule {
         on: {
           RESET: {
             target: ".initializing",
-            actions: assign(DEFAULT_CONTEXT),
+            actions: [
+              assign(DEFAULT_CONTEXT),
+              () => this.logger.log("Resetting orchestrator", "info", "reset", this.id),
+            ],
+          },
+          ERROR: {
+            target: "#ETL-error",
+            actions: [
+              assign(({ event }) => ({ unexpectedError: event.error.toString() })),
+              () => this.logger.log("Error in orchestrator", "error", "error", this.id),
+            ],
           },
         },
       } as const,
@@ -765,7 +807,7 @@ export class OrchestratorModule implements IOrchestratorModule {
           importFile: fromPromise(async ({ input, signal }: any) => {
             const importer = this.provider.modules.importer;
             const [stream, totalRowsEstimated] = importer.readFileStream(input.file, signal);
-            return { stream, totalRowsEstimated };
+            return { stream, totalRowsEstimated: totalRowsEstimated.value };
           }),
           mapping: fromPromise(async ({ input, signal }: any) => {
             const mapper = this.provider.modules.mapper;
@@ -785,55 +827,82 @@ export class OrchestratorModule implements IOrchestratorModule {
               signal
             );
           }),
-          persisting: fromPromise(async ({ input, emit, signal }: any) => {
+          persisting: fromCallback(({ input, sendBack, signal }: any) => {
             const persistence = this.provider.modules.persistence;
-            persistence.saveStream(
-              input.activeStream,
-              input.totalEstimatedRows,
-              () => emit({ type: "FIRST_CHUNK_RAW_READY" }),
-              signal
-            );
+
+            let active = true;
+
+            persistence
+              .saveStream(
+                input.activeStream,
+                input.totalEstimatedRows,
+                () => active && sendBack({ type: "FIRST_CHUNK_RAW_READY" }),
+                signal
+              )
+              .catch((err) => sendBack({ type: "ERROR", error: err }));
+
+            return () => {
+              active = false;
+            };
           }),
-          handlingGlobalStep: fromPromise(async ({ input, signal, emit }: any) => {
+          handlingGlobalStep: fromCallback(({ input, signal, sendBack }: any) => {
+            let active = true;
             const globalStepEngine = this.provider.modules.globalStepEngine;
             const persistence = this.provider.modules.persistence;
 
-            for (const step of input.layout.globalSteps) {
-              const removedErrorsAcc: number[] = [];
-              const filter = step.filter.rows;
-              const streamInput = persistence.getRowsStream(filter);
+            const inputParsed = input as {
+              layout: LayoutBase;
+            };
 
-              const streamResult = globalStepEngine.handleStep(streamInput, step, null, signal);
-              const transformedStream = streamResult.pipeThrough(
-                new TransformStream({
-                  transform: async ({ rows, errors, removedErrors }: any, controller) => {
-                    removedErrorsAcc.push(...(removedErrors ?? []));
-                    controller.enqueue({ rawRows: rows, errorDicc: errors });
-                  },
-                })
-              );
+            const runSteps = async () => {
+              try {
+                for (const step of inputParsed.layout.globalSteps ?? []) {
+                  if (!active) return;
+                  signal?.throwIfAborted();
 
-              persistence
-                .saveStream(
-                  transformedStream,
-                  null,
-                  () => emit({ type: "FIRST_CHUNK_PROCESSED_READY" }),
-                  signal
-                )
-                .then(() => emit({ type: "ALL_CHUNKS_PROCESSED" }));
-              if (removedErrorsAcc.length > 0) {
-                persistence.deleteErrors(removedErrorsAcc);
+                  const removedErrorsAcc: number[] = [];
+                  const filter = step.filter.rows;
+                  const streamInput = persistence.getRowsStream(filter);
+
+                  const streamResult = globalStepEngine.handleStep(streamInput, step, null, signal);
+
+                  const transformedStream = streamResult.pipeThrough(
+                    new TransformStream({
+                      transform: async ({ rows, errors, removedErrors }: any, controller) => {
+                        removedErrorsAcc.push(...(removedErrors ?? []));
+                        controller.enqueue({ rows, errorDicc: errors });
+                      },
+                    })
+                  );
+
+                  await persistence.saveStream(transformedStream, null, null, signal);
+
+                  if (removedErrorsAcc.length > 0) {
+                    await persistence.deleteErrors(removedErrorsAcc);
+                  }
+                }
+
+                if (active) sendBack({ type: "FINAL_PROCESSING_READY" });
+              } catch (err) {
+                sendBack({ type: "ERROR", error: err });
               }
-            }
+            };
+
+            runSteps();
+
+            return () => {
+              active = false;
+            };
           }),
           loadingMetrics: fromPromise(async ({ input, signal }: any) => {
             const persistence = this.provider.modules.persistence;
             const viewer = this.provider.modules.viewer;
 
             await persistence.updateMetrics();
-            const metrics = await persistence.getMetrics();
 
-            const totalPages = viewer.getTotalPages(metrics.totalRows);
+            const metrics = await persistence.getMetrics();
+            const totalPages = viewer.getTotalPages(metrics?.totalRows ?? 0);
+
             return { metrics, totalPages };
           }),
           loadingRows: fromPromise(async ({ input, signal }: any) => {
@@ -888,7 +957,7 @@ export class OrchestratorModule implements IOrchestratorModule {
                 new TransformStream({
                   transform: async ({ rows, errors, removedErrors }: any, controller) => {
                     removedErrorsAcc.push(...(removedErrors ?? []));
-                    controller.enqueue({ rawRows: rows, errorDicc: errors });
+                    controller.enqueue({ rows, errorDicc: errors });
                   },
                 })
               );
@@ -902,7 +971,6 @@ export class OrchestratorModule implements IOrchestratorModule {
           removingRow: fromPromise(async ({ input, signal }: any) => {
             const persistence = this.provider.modules.persistence;
             await persistence.deleteRow(input.removingRow.rowId);
-            await persistence.updateMetrics();
           }),
           exporting: fromPromise(async ({ input, signal }: any) => {
             const exporter = this.provider.modules.exporter;
@@ -981,8 +1049,10 @@ export class OrchestratorModule implements IOrchestratorModule {
           distinctUntilChanged()
         )
         .subscribe((val) => {
-          this.stateSubject.next(val as OrchestratorStateType);
-          this.stateSignal.value = val as OrchestratorStateType;
+          const valParsed = typeof val === "string" ? val : Object.keys(val)[0];
+
+          this.stateSubject.next(valParsed as OrchestratorStateType);
+          this.stateSignal.value = valParsed as OrchestratorStateType;
         })
     );
 

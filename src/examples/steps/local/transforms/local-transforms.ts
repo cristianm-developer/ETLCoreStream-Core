@@ -1,5 +1,17 @@
 import type { LocalStepTransform } from "@/shared/schemes/local-step-transforms";
 
+export const toUpperCase = (headerKey: string): LocalStepTransform => ({
+  headerKey,
+  name: "toUpperCase",
+  fn: (value: string, _row: any, ..._args: any[]) => value.toUpperCase(),
+});
+
+export const toLowerCase = (headerKey: string): LocalStepTransform => ({
+  headerKey,
+  name: "toLowerCase",
+  fn: (value: string, _row: any, ..._args: any[]) => value.toLowerCase(),
+});
+
 /**
  * Elimina espacios en blanco al inicio y final del valor
  */

@@ -1,3 +1,4 @@
+import { FileMetrics } from "@/shared";
 import type { ValidationError } from "@/shared/schemes/local-step-validators";
 import type { RowFilter } from "@/shared/schemes/persistent-filter";
 import type { RowObject } from "@/shared/schemes/row-object";
@@ -8,10 +9,7 @@ export interface OrchestratorContext {
   layout: any | null;
   progress: { label: string; value: number | null }[];
   unexpectedError: string | null;
-  metrics?: {
-    totalRows: number;
-    errorCount: number;
-  };
+  metrics?: Partial<FileMetrics> | null;
   editingRow: { rowId: number; key: string; value: string } | null;
   removingRow: { rowId: number } | null;
   exporting: { id: string; target: "Stream" | "File" } | null;

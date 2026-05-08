@@ -70,6 +70,7 @@ export const LayoutExample: LayoutBase = {
   // globalSteps follow the GlobalStep shape
   globalSteps: [
     {
+      description: "Global validation step",
       name: "Global Validation Step",
       order: ["validators"],
       reprocessAllRowsOnChange: true,

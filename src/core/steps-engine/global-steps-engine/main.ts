@@ -75,7 +75,7 @@ export class GlobalStepsEngineModule implements IGlobalStepsEngineModule {
     const removedErrors: number[] = [];
 
     for (const order of step.order) {
-      signal?.throwIfAborted();
+      signal?.throwIfAborted();      
 
       if (order === "transforms") {
         for (const transform of step.transforms || []) {
@@ -103,7 +103,17 @@ export class GlobalStepsEngineModule implements IGlobalStepsEngineModule {
     signal?: AbortSignal
   ): Promise<{ validationErrors: ValidationError[]; removedValidationErrors: number[] }> {
     signal?.throwIfAborted();
-    const result = await validator.fn(rows, ...validator.args);
+
+    const result = await validator.fn(rows, ...validator.args || []);
+
+    result.removedValidationErrors.forEach((removedValidationError) => {
+      rows[removedValidationError].__isError = undefined;
+    });
+
+    result.validationErrors.forEach((validationError) => {
+      rows[validationError.__rowId].__isError = `${validationError.headerKey}:${validationError.validationCode}`;
+    });
+
     return {
       validationErrors: result.validationErrors,
       removedValidationErrors: result.removedValidationErrors,
@@ -116,7 +126,7 @@ export class GlobalStepsEngineModule implements IGlobalStepsEngineModule {
     signal?: AbortSignal
   ): Promise<void> {
     signal?.throwIfAborted();
-    await transform.fn(rows, ...transform.args);
+    await transform.fn(rows, ...transform.args || []);
   }
 
   updateOptions(options: Partial<GlobalStepsEngineModuleOptions>): void {

@@ -39,7 +39,7 @@ export interface IPersistenceModule {
   progress: number | null;
 
   saveStream: (
-    stream: ReadableStream<{ rawRows: RowObject[]; errorDicc: Record<number, ValidationError> }>,
+    stream: ReadableStream<{ rows: RowObject[]; errorDicc: Record<number, ValidationError> }>,
     totalRowEstimated: number | null,
     onFirstChunkReady?: () => void,
     signal?: AbortSignal

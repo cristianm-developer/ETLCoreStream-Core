@@ -4,8 +4,8 @@ import type { LocalStepValidator } from "./local-step-validators";
 export type LayoutLocalStep = {
   id: string;
   name: string;
-  description: string;
-  order: "transforms" | "validators"[];
+  description?: string;
+  order: ("transforms" | "validators")[];
   transforms?: LocalStepTransform[];
   validators?: LocalStepValidator[];
 };

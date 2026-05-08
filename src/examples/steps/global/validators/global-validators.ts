@@ -3,7 +3,6 @@ import type { ValidationError } from "@/shared/schemes/local-step-validators";
 import type { RowObject } from "@/shared/schemes/row-object";
 
 export const AsyncValidateDataExample = (): GlobalStepValidator => ({
-  headerKey: "headerKey",
   name: "AsyncValidateDataExample",
   fn: async (rows: RowObject[], ..._args: any[]) => {
     const validationResults = await validateDataExample(

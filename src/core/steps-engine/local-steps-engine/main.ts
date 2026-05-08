@@ -101,7 +101,12 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
             metrics: chunk.metrics,
           });
         } catch (error) {
-          this.logger.log(`Error in steps engine`, "error", "handleStream", this.id);
+          this.logger.log(
+            `Error in steps engine - ` + (error as Error).message,
+            "error",
+            "handleStream",
+            this.id
+          );
           this.logger.updateStatus({
             order: 99,
             progress: 0,
@@ -152,6 +157,15 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
 
     for (const next of order) {
       this.handleAbortSignal(signal);
+      if (row.__isError) {
+        this.logger.log(
+          `Row ${row.__rowId} is error, skipping step ${step.name}`,
+          "debug",
+          "handleStep",
+          this.id
+        );
+        continue;
+      }
       (executionFn as any)[next]?.({ step, row, signal, errorDicc, errorCount });
     }
   };
@@ -185,7 +199,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
       for (const validator of validators) {
         this.handleAbortSignal(signal);
 
-        const { headerKey, fn, args } = validator;
+        const { headerKey, fn, args = [] } = validator;
         const cellValue = row.value[headerKey];
 
         try {
@@ -201,7 +215,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
               originalValue: row.__originalValue?.[headerKey],
               step: step.name,
             };
-            row.__isError = result.validationCode;
+            row.__isError = `${validator.headerKey}:${result.validationCode}` ;
             errorCount.count++;
             break;
           }
@@ -252,14 +266,16 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
     if (transforms) {
       for (const transform of transforms) {
         this.handleAbortSignal(signal);
-        const { headerKey, fn, args } = transform;
+        const { headerKey, fn, args = [] } = transform;
 
         try {
           const cellValue = row.value[headerKey];
           const result = fn(cellValue, row, ...args);
           row.value[headerKey] = result;
         } catch (error) {
-          throw new Error(`Unexpected error in transform ${transform.headerKey}:${transform.name}`);
+          throw new Error(
+            `Unexpected error in transform ${transform.headerKey}:${transform.name} - ${(error as Error).message}`
+          );
         }
       }
     }

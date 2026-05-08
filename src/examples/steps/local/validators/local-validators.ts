@@ -328,35 +328,3 @@ export const notNegative = (headerKey: string): LocalStepValidator => ({
     };
   },
 });
-
-/**
- * Factory function to create a collection of all available local validators
- * Note: Validators that require parameters (regex, maxLength, minLength, maxValue, minValue, inRange, inList)
- * must be instantiated directly with their required arguments.
- * Example: regex(headerKey, pattern, flags), maxLength(headerKey, max), etc.
- */
-export const createLocalValidators = (headerKey: string) => ({
-  notNull: notNull(headerKey),
-  onlyNumeric: onlyNumeric(headerKey),
-  notEmpty: notEmpty(headerKey),
-  notNegative: notNegative(headerKey),
-});
-
-/**
- * Collection of all available local validators (factory functions)
- */
-export const LocalValidators = {
-  notNull,
-  onlyNumeric,
-  regex,
-  maxLength,
-  minLength,
-  notEmpty,
-  maxValue,
-  minValue,
-  inRange,
-  inList,
-  notNegative,
-};
-
-export default LocalValidators;

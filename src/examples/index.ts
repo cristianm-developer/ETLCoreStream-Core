@@ -1,31 +1,8 @@
 // Layout Examples
 export { LayoutExample } from "./layout/layout-example";
 
-// Local Step Validators
-export {
-  notNull,
-  onlyNumeric,
-  regex,
-  maxLength,
-  minLength,
-  notEmpty,
-  maxValue,
-  minValue,
-  inRange,
-  inList,
-  notNegative,
-  createLocalValidators,
-  LocalValidators,
-} from "./steps/local/validators/local-validators";
-
-// Local Step Transforms
-export {
-  trim,
-  diccTransform,
-  extractDigits,
-  clear,
-  boolResult,
-} from "./steps/local/transforms/local-transforms";
+// Local Step Examples
+export { LocalStepFnsExample } from "./steps/local/local";
 
 // Global Step Validators
 export { AsyncValidateDataExample } from "./steps/global/validators/global-validators";
