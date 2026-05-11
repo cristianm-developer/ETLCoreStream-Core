@@ -1,11 +1,10 @@
-import type { OrchestratorContext } from "./schemes/orchestrator-context";
-import type { OrchestratorStateType } from "./schemes/orchestrator-states";
 import type { LayoutBase } from "@/shared/schemes/layout-base";
 import type { Log } from "@/shared/schemes/log";
 import type { Observable } from "rxjs";
 import type { ProviderModule } from "../provider/main";
 import type { Notification } from "@/shared/schemes/notification";
-import type { RowFilter, RowObject, ValidationError } from "@/shared";
+import type { FileMetrics, RowFilter, RowObject } from "@/shared";
+import type { ReadonlySignal } from "@preact/signals-core";
 
 export interface IOrchestratorModule {
   initialize(provider: ProviderModule, id?: string): void;
@@ -13,35 +12,48 @@ export interface IOrchestratorModule {
   /* identity / state / context */
   getId(): string;
   getCurrentState(): string;
-  getCurrentContext(): OrchestratorContext;
+  getCurrentContext(): any;
 
   /* reactive observables exposed by the module */
-  progress$: Observable<{ label: string; value: number | null }[]>;
-  state$: Observable<OrchestratorStateType>;
-  context$: Observable<OrchestratorContext>;
-  metrics$: Observable<OrchestratorContext["metrics"]>;
   logs$: Observable<Log>;
-  layout$: Observable<LayoutBase | null>;
-  file$: Observable<File | null>;
   notification$: Observable<Notification | null>;
 
   //handler for signals access
-  layout: LayoutBase;
-  state: OrchestratorStateType;
-  metrics: OrchestratorContext["metrics"];
-  progress: { label: string; value: number | null }[];
-  file: File | null;
-  context: OrchestratorContext;
+  layout$: Observable<LayoutBase | null>;
+  layout: ReadonlySignal<LayoutBase | null>;
+  state$: Observable<any>;
+  state: ReadonlySignal<any>;
+  metrics$: Observable<FileMetrics | null>;
+  metrics: ReadonlySignal<FileMetrics | null>;
+  progress$: Observable<{ label: string; value: number | null }[]>;
+  progress: ReadonlySignal<{ label: string; value: number | null }[]>;
+  file$: Observable<File | null>;
+  file: ReadonlySignal<File | null>;
+  context$: Observable<any | null>;
+  context: ReadonlySignal<any | null>;
 
-  currentRows: RowObject[] | null;
-  currentErrors: ValidationError[] | null;
+  currentRows$: Observable<RowObject[] | null>;
+  currentRows: ReadonlySignal<RowObject[] | null>;
 
-  viewPaginationInfo: {
+  viewPaginationInfo$: Observable<{ currentPage: number | null; totalPages: number | null }>;
+  viewPaginationInfo: ReadonlySignal<{
     currentPage: number;
     totalPages: number;
-    totalEstimatedRows: number;
-  };
-  viewFilter: RowFilter | null;
+  }>;
+  viewFilter$: Observable<RowFilter | null>;
+  viewFilter: ReadonlySignal<RowFilter | null>;
+
+  errors$: Observable<{
+    unexpected: Error | null;
+    expected: Error | null;
+  }>;
+  errors: ReadonlySignal<{
+    unexpected: Error | null;
+    expected: Error | null;
+  }>;
+
+  step$: Observable<string[]>;
+  step: ReadonlySignal<string[]>;
 
   /* helper to retrieve logs synchronously from the logger */
   getLogs(

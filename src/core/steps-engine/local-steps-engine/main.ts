@@ -8,7 +8,9 @@ import type {
   LocalStepsEngineModuleOptions,
 } from "../i-local-steps-engine-module";
 import { DEFAULT_STEPS_ENGINE_OPTIONS } from "../i-local-steps-engine-module";
-import { Signal } from "@preact/signals-core";
+import type { Signal } from "@preact/signals-core";
+import { signal } from "@preact/signals-core";
+import { yieldControl } from "@/shared";
 
 export type { LocalStepsEngineModuleOptions as StepsEngineModuleOptions };
 export { DEFAULT_STEPS_ENGINE_OPTIONS };
@@ -18,10 +20,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
   private options: LocalStepsEngineModuleOptions;
   private logger: LoggerModule;
 
-  private progressSignal = new Signal<number | null>(null);
-  get progress() {
-    return this.progressSignal.value;
-  }
+  progress = signal<number | null>(null);
 
   constructor(logger: LoggerModule, options: LocalStepsEngineModuleOptions) {
     this.options = { ...DEFAULT_STEPS_ENGINE_OPTIONS, ...options };
@@ -29,12 +28,12 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
     this.logger.log("LocalStepsEngineModule initialized", "debug", "constructor", this.id);
   }
 
-  getProgress = () => this.progressSignal;
+  getProgress = () => this.progress;
 
-  handleStream = async (
+  handleStream = (
     stream: ReadableStream,
     layout: LayoutBase,
-    totalRowEstimated: number,
+    totalRowEstimated: Signal<number | null>,
     signal?: AbortSignal,
     step: string = "steps-engine",
     order: number = 2
@@ -46,6 +45,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
     const errorDicc: Record<string, ValidationError> = {};
 
     let totalRowsProcessed = 0;
+    let lastProgress = 0;
 
     const transformer = new TransformStream({
       transform: async (chunk, controller) => {
@@ -60,7 +60,14 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
             const row = rows[i] as RowObject;
             const steps = layout.localSteps;
 
-            this.progressSignal.value = Math.round((totalRowsProcessed / totalRowEstimated) * 100);
+            const currentProgress = Math.round(
+              (totalRowsCount / (totalRowEstimated?.value ?? 0)) * 100
+            );
+            const rounded = Math.floor(currentProgress / 5) * 5;
+            if (rounded > lastProgress) {
+              lastProgress = rounded;
+              this.progress.value = Math.min(Number(currentProgress.toFixed(2)), 100);
+            }
 
             if (row.__isError) {
               this.logger.log(
@@ -89,6 +96,8 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
             for (const step of steps) {
               this.handleStep(step, row, errorCount, signal, errorDicc);
             }
+
+            await yieldControl();
           }
 
           controller.enqueue({
@@ -104,7 +113,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
           this.logger.log(
             `Error in steps engine - ` + (error as Error).message,
             "error",
-            "handleStream",
+            step,
             this.id
           );
           this.logger.updateStatus({
@@ -124,7 +133,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
           status: "completed",
           step: "steps-engine",
         });
-        this.progressSignal.value = null;
+        this.progress.value = null;
       },
     });
 
@@ -183,13 +192,6 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
     errorCount: { count: number };
     signal?: AbortSignal;
   }) => {
-    this.logger.log(
-      `Executing validators for step ${step.name}`,
-      "debug",
-      "executeValidators",
-      this.id
-    );
-
     this.handleAbortSignal(signal);
 
     const { validators } = step;
@@ -215,7 +217,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
               originalValue: row.__originalValue?.[headerKey],
               step: step.name,
             };
-            row.__isError = `${validator.headerKey}:${result.validationCode}` ;
+            row.__isError = `${validator.headerKey}:${result.validationCode}`;
             errorCount.count++;
             break;
           }
@@ -226,7 +228,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
             validationCode: `UNEXPECTED_ERROR - ${validator.headerKey}:${validator.name}`,
             message: (error as Error).message,
             value: cellValue,
-            originalValue: row.__originalValue[headerKey],
+            originalValue: row.__originalValue?.[headerKey] ?? undefined,
             step: step.name,
           };
           errorCount.count++;
@@ -255,12 +257,6 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
     signal?: AbortSignal;
   }) => {
     this.handleAbortSignal(signal);
-    this.logger.log(
-      `Executing transforms for step ${step.name}`,
-      "debug",
-      "executeTransforms",
-      this.id
-    );
 
     const { transforms } = step;
     if (transforms) {

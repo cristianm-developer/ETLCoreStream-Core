@@ -38,15 +38,9 @@ export interface IExporterModule {
    * Exporta datos a CSV con escritura incremental (chunk por chunk sin llenar RAM)
    */
   exportToCsv: (
-    inputStream: ReadableStream<{ rows: any }>,
-    totalRowsCount: number,
+    inputStream: ReadableStream<any[]>,
     filename: string,
     diccLabels?: Record<string, string>,
-    onProgress?: (progress: {
-      bytesWritten: number;
-      rowsProcessed: number;
-      percentage: number;
-    }) => void,
     signal?: AbortSignal
   ) => Promise<void>;
 

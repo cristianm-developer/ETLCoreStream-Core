@@ -5,7 +5,8 @@ import type { ErrorFilter, RowFilter } from "@/shared/schemes/persistent-filter"
 import type { RowObject } from "@/shared/schemes/row-object";
 import type { ValidationError } from "@/shared/schemes/local-step-validators";
 import type { FileMetrics } from "@/shared/schemes/file-metrics";
-import { Signal } from "@preact/signals-core";
+import type { Signal } from "@preact/signals-core";
+import { signal } from "@preact/signals-core";
 
 export class PersistenceIndexDbModule implements IPersistenceModule {
   public id = "persistence-indexdb" as const;
@@ -14,10 +15,7 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
 
   private db: IDBDatabase | null = null;
 
-  private progressSignal = new Signal<number | null>(null);
-  get progress() {
-    return this.progressSignal.value;
-  }
+  progress = signal<number | null>(null);
 
   constructor(logger: LoggerModule, options: PersistenceModuleOptions) {
     this.logger = logger;
@@ -28,7 +26,7 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
     this.getErrorsStream = this.getErrorsStream.bind(this);
   }
 
-  getProgress = () => this.progressSignal;
+  getProgress = () => this.progress;
 
   private dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -41,6 +39,7 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
 
       request.onupgradeneeded = () => {
         const db = request.result;
+        this.logger.log("Database upgraded", "debug", "initDb", this.id);
         if (!db.objectStoreNames.contains(this.options.storeNames.rows)) {
           db.createObjectStore(this.options.storeNames.rows, {
             keyPath: this.options.storeKeys.rows,
@@ -75,6 +74,7 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
           );
           this.db?.close();
           this.db = null;
+          this.dbPromise = null;
         };
 
         resolve(this.db);
@@ -100,7 +100,7 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
 
   private executeTransaction = async (
     mode: IDBTransactionMode,
-    actions: { storeName: string; fn: (store: IDBObjectStore) => void }[]
+    actions: { storeName: string; fn: (store: IDBObjectStore) => void | Promise<any> }[]
   ) => {
     let attempts = 0;
     const maxAttempts = 2;
@@ -113,22 +113,23 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
         return await new Promise((resolve, reject) => {
           const transaction = db.transaction(storeNames, mode);
 
-          try {
-            for (const action of actions) {
-              const store = transaction.objectStore(action.storeName);
-              action.fn(store);
-            }
-            if (typeof transaction.commit === "function") {
-              transaction.commit();
-            }
-          } catch (error) {
-            transaction.abort();
-            return reject(error);
-          }
+          const runActions = async () => {
+            try {
+              for (const action of actions) {
+                const store = transaction.objectStore(action.storeName);
+                await action.fn(store);
+              }
 
-          transaction.oncomplete = () => {
-            resolve(true);
+              if (typeof transaction.commit === "function") {
+                transaction.commit();
+              }
+            } catch (error) {
+              if (transaction.db) transaction.abort();
+              reject(error);
+            }
           };
+
+          transaction.oncomplete = () => resolve(true);
 
           transaction.onerror = () => {
             const error = transaction.error;
@@ -149,10 +150,12 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
             );
             reject(new Error("Transaction failed: " + errorMsg));
           };
+
+          runActions();
         });
       } catch (error) {
         attempts++;
-        this.db = null;
+        this.db = null; // Clean up instance for retry
         if (attempts >= maxAttempts) {
           this.logger.log(
             `Transaction failed after ${maxAttempts} attempts`,
@@ -396,11 +399,10 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
   getErrorById = async (id: number) => {
     const db = await this.initDb();
     return new Promise<ValidationError | undefined>((resolve, reject) => {
-
       const transaction = db.transaction(this.options.storeNames.errors, "readonly");
       const store = transaction.objectStore(this.options.storeNames.errors);
       const request = store.get(id);
-  
+
       request.onsuccess = () => {
         resolve(request.result ?? undefined);
       };
@@ -412,9 +414,9 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
 
   saveStream = async (
     stream: ReadableStream<{ rows: RowObject[]; errorDicc: Record<number, ValidationError> }>,
-    totalRowEstimated: number | null,
-    onFirstChunkReady?: () => void,
-    signal?: AbortSignal
+    totalRowEstimated: Signal<number | null> | null,
+    onFirstChunkReady?: (() => void) | null,
+    signal?: AbortSignal | null
   ) => {
     await this.initDb();
 
@@ -464,9 +466,11 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
 
           totalRowsProcessed += rows.length;
           if (totalRowEstimated !== null) {
-            this.progressSignal.value = Math.round((totalRowsProcessed / totalRowEstimated) * 100);
+            this.progress.value = Math.round(
+              (totalRowsProcessed / (totalRowEstimated?.value ?? 0)) * 100
+            );
           } else {
-            this.progressSignal.value = null;
+            this.progress.value = null;
           }
         } catch (error) {
           this.logger.log(
@@ -485,6 +489,7 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
       },
       close: async () => {
         this.logger.log("Writable stream closed", "debug", "saveStream", this.id);
+        this.progress.value = null;
       },
       abort: (reason) => {
         this.logger.log(`Writable stream aborted: ${reason}`, "warn", "saveStream", this.id);
@@ -506,35 +511,41 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
   };
 
   clear: () => Promise<void> = async () => {
-    await this.executeTransaction("readwrite", [
-      {
-        storeName: this.options.storeNames.rows,
-        fn: (store) => {
-          store.clear();
-        },
-      },
-      {
-        storeName: this.options.storeNames.errors,
-        fn: (store) => {
-          store.clear();
-        },
-      },
-      {
-        storeName: this.options.storeNames.metrics,
-        fn: (store) => {
-          store.clear();
-        },
-      },
-    ]);
+    if (this.db) {
+      this.db.close();
+      this.db = null;
+    }
+
+    this.dbPromise = null;
+
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.deleteDatabase(this.options.dbName!);
+      request.onsuccess = () => {
+        this.logger.log("Database deleted successfully", "debug", "clear", this.id);
+        resolve();
+      };
+      request.onerror = () => {
+        this.logger.log(
+          "Error deleting database: " + request.error?.message,
+          "error",
+          "clear",
+          this.id
+        );
+        reject(request.error);
+      };
+      request.onblocked = () => {
+        this.logger.log("Database is blocked", "error", "clear", this.id);
+        reject(new Error("Database is blocked"));
+      };
+    });
   };
 
   getRowById: (id: number) => Promise<RowObject | undefined> = async (id: number) => {
     const db = await this.initDb();
 
     return new Promise<RowObject | undefined>((resolve, reject) => {
-
       const transaction = db.transaction(this.options.storeNames.rows, "readonly");
-  
+
       const storeRows = transaction.objectStore(this.options.storeNames.rows);
 
       const request = storeRows.get(id);
@@ -545,7 +556,6 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
         reject(request.error);
       };
     });
-
   };
 
   updateRow: (row: RowObject) => Promise<void> = async (row: RowObject) => {
@@ -557,9 +567,9 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
         },
       },
     ]);
-    const error = this.getErrorById(row.__rowId);
+    const error = await this.getErrorById(row.__rowId);
     if (error) {
-      this.deleteErrors([row.__rowId]);
+      await this.deleteErrors([row.__rowId]);
     }
   };
 
@@ -575,13 +585,12 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
       {
         storeName: this.options.storeNames.errors,
         fn: (store) => {
-          if(currentError) {
+          if (currentError) {
             store.delete(id);
           }
-        }
-      }
+        },
+      },
     ]);
-
   };
 
   deleteErrors: (ids: number[]) => Promise<void> = async (ids: number[]) => {
@@ -595,63 +604,71 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
     ]);
   };
 
-  updateMetrics: () => Promise<void> = async () => {
-    const metrics = await this.getMetrics() ?? {totalRows: 0, totalErrorRows: 0, id: "1"};
+  updateMetrics: (fileName: string) => Promise<void> = async (fileName: string) => {
+    // 1. Get base metrics
+    const metrics = (await this.getMetrics(fileName)) ?? {
+      [this.options.storeKeys.metrics]: fileName,
+      totalRows: 0,
+      totalErrorRows: 0,
+    };
 
+    let totalRows = 0;
+    let totalErrors = 0;
+
+    this.logger.log("Updating metrics for file: " + fileName, "debug", "updateMetrics", this.id);
+
+    // 2. Read transaction (counts)
     await this.executeTransaction("readonly", [
       {
         storeName: this.options.storeNames.rows,
-        fn: (store) => {
-          return new Promise((resolve, reject) => {
-
-            const request = store.getAll();
-            request.onsuccess = () => {
-              const allRows = request.result;
-              const totalRows = allRows.length;
-              const totalErrorRows = allRows.filter((row: any) => row.__isError).length;
-  
-              this.logger.log(
-                "Reading all rows..." + `totalRows: ${totalRows}, totalErrorRows: ${totalErrorRows}`,
-                "debug",
-                "updateMetrics",
-                this.id
-              );
-  
-              if (metrics) {
-                metrics.totalRows = totalRows;
-                metrics.totalErrorRows = totalErrorRows;
-              }
-
-              resolve(metrics);
+        fn: (store) =>
+          new Promise<void>((resolve, reject) => {
+            const req = store.count();
+            req.onsuccess = () => {
+              totalRows = req.result;
+              resolve();
             };
-
-            request.onerror = () => {
-              reject(request.error);
+            req.onerror = () => reject(req.error);
+          }),
+      },
+      {
+        storeName: this.options.storeNames.errors,
+        fn: (store) =>
+          new Promise<void>((resolve, reject) => {
+            const req = store.count();
+            req.onsuccess = () => {
+              totalErrors = req.result;
+              resolve();
             };
-          })
-        },
+            req.onerror = () => reject(req.error);
+          }),
       },
     ]);
 
+    // 3. Write transaction
     await this.executeTransaction("readwrite", [
       {
         storeName: this.options.storeNames.metrics,
         fn: (store) => {
-          store.put({ id: "1", ...metrics });
+          store.put({
+            ...metrics,
+            totalRows,
+            totalErrorRows: totalErrors,
+          });
         },
       },
     ]);
   };
 
-  getMetrics: () => Promise<FileMetrics | undefined> = async () => {
+  getMetrics: (fileName: string) => Promise<FileMetrics | undefined> = async (fileName: string) => {
     const db = await this.initDb();
     const transaction = db.transaction(this.options.storeNames.metrics, "readonly");
     const store = transaction.objectStore(this.options.storeNames.metrics);
 
     return new Promise((resolve, reject) => {
-      const request = store.getAll();
+      const request = store.get(fileName);
       request.onsuccess = () => {
-        resolve(request.result[0]);
+        resolve(request.result ?? undefined);
       };
       request.onerror = () => {
         reject(request.error);

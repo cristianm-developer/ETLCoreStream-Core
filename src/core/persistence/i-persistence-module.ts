@@ -2,6 +2,7 @@ import type { ValidationError } from "@/shared/schemes/local-step-validators";
 import type { RowFilter } from "@/shared/schemes/persistent-filter";
 import type { RowObject } from "@/shared/schemes/row-object";
 import type { FileMetrics } from "@/shared/schemes/file-metrics";
+import type { Signal } from "@preact/signals-core";
 
 export type PersistenceModuleOptions = {
   chunkSizeQtd?: number;
@@ -29,20 +30,20 @@ export const DEFAULT_PERSISTENCE_MODULE_OPTIONS: PersistenceModuleOptions = {
   storeKeys: {
     rows: "__rowId",
     errors: "__rowId",
-    metrics: "id",
+    metrics: "fileName",
   },
 };
 
 export interface IPersistenceModule {
   id: "persistence-indexdb";
 
-  progress: number | null;
+  progress: Signal<number | null>;
 
   saveStream: (
     stream: ReadableStream<{ rows: RowObject[]; errorDicc: Record<number, ValidationError> }>,
-    totalRowEstimated: number | null,
-    onFirstChunkReady?: () => void,
-    signal?: AbortSignal
+    totalRowEstimated: Signal<number | null> | null,
+    onFirstChunkReady?: (() => void) | null,
+    signal?: AbortSignal | null
   ) => Promise<void>;
   getRowsStream: (filter: RowFilter) => ReadableStream<{ rows: RowObject[] }>;
   getErrorsStream: (filter: RowFilter) => ReadableStream<{ errors: ValidationError[] }>;
@@ -55,7 +56,7 @@ export interface IPersistenceModule {
   deleteRow: (id: number) => Promise<void>;
   deleteErrors: (ids: number[]) => Promise<void>;
 
-  updateMetrics: () => Promise<void>;
-  getMetrics: () => Promise<FileMetrics | undefined>;
+  updateMetrics: (fileName: string) => Promise<void>;
+  getMetrics: (fileName: string) => Promise<FileMetrics | undefined>;
   updateOptions(options: Partial<PersistenceModuleOptions>): void;
 }

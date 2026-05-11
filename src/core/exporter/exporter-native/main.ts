@@ -42,31 +42,24 @@ export class ExporterNativeModule implements IExporterModule {
 
           const parseResult = rows.map((row) => exportFn(row));
 
-          controller.enqueue({
-            rows: parseResult,
-          });
+          controller.enqueue(parseResult);
         },
       })
     );
   };
 
   exportToCsv = async (
-    inputStream: ReadableStream<{ rows: any }>,
-    totalRowsCount: number,
+    inputStream: ReadableStream<any[]>,
     filename: string,
     diccLabels?: Record<string, string>,
-    onProgress?: (progress: {
-      bytesWritten: number;
-      rowsProcessed: number;
-      percentage: number;
-    }) => void,
     signal?: AbortSignal
   ) => {
-    const fileStream = await streamsaver.createWritable(
+    const fileStream = await streamsaver.createWriteStream(
       filename.endsWith(".csv") ? filename : filename + ".csv"
     );
+
     const writer = fileStream.getWriter();
-    const enconder = new TextEncoder();
+    const encoder = new TextEncoder();
     const reader = inputStream.getReader();
 
     let rowCount = 0;
@@ -77,10 +70,11 @@ export class ExporterNativeModule implements IExporterModule {
     try {
       if (diccLabels) {
         const headerText = Object.values(diccLabels).join(",") + "\n";
-        const headerBuffer = enconder.encode(headerText);
+        const headerBuffer = encoder.encode(headerText);
         await writer.write(headerBuffer);
         bytesWritten += headerBuffer.length;
         headerInitialized = true;
+        dataKeys = Object.keys(diccLabels);
       }
 
       while (true) {
@@ -88,13 +82,13 @@ export class ExporterNativeModule implements IExporterModule {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const { rows } = value;
+        const rows = value;
         if (!rows || rows.length === 0) continue;
 
         if (!headerInitialized) {
           dataKeys = Object.keys(rows[0]);
           const headerText = dataKeys.join(",") + "\n";
-          const headerBuffer = enconder.encode(headerText);
+          const headerBuffer = encoder.encode(headerText);
           await writer.write(headerBuffer);
           bytesWritten += headerBuffer.length;
           headerInitialized = true;
@@ -102,7 +96,7 @@ export class ExporterNativeModule implements IExporterModule {
 
         const csvChunk =
           rows
-            .map((r: RowObject) =>
+            .map((r: any) =>
               dataKeys
                 .map((k) => {
                   const cell = r[k] ?? "";
@@ -112,19 +106,11 @@ export class ExporterNativeModule implements IExporterModule {
             )
             .join("\n") + "\n";
 
-        const csvBuffer = enconder.encode(csvChunk);
+        const csvBuffer = encoder.encode(csvChunk);
         await writer.write(csvBuffer);
 
         bytesWritten += csvBuffer.length;
         rowCount += rows.length;
-
-        if (onProgress) {
-          onProgress({
-            bytesWritten,
-            rowsProcessed: rowCount,
-            percentage: Math.round((rowCount / totalRowsCount) * 100),
-          });
-        }
       }
 
       await writer.close();

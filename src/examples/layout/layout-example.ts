@@ -76,15 +76,15 @@ export const LayoutExample: LayoutBase = {
       reprocessAllRowsOnChange: true,
       filter: {
         rows: { withErrors: false },
-        errors: {},
       },
       validators: [],
     },
   ],
 
   // exports: ejemplos mínimos que cumplen la forma esperada (fn + labelDicc opcional)
-  exports: {
-    basic: {
+  exports: [
+    {
+      name: "Export Just Name and Email",
       fn: (row: any) => ({
         name: row?.value?.name,
         email: row?.value?.email,
@@ -94,7 +94,7 @@ export const LayoutExample: LayoutBase = {
         email: "Email",
       },
     },
-  },
+  ],
 };
 
 // Ejemplo de header a nivel de sección, expresado según los campos usados en la UI

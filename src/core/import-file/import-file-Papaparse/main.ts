@@ -8,7 +8,7 @@ import type {
   StreamResult,
 } from "../i-import-file-module";
 import { DEFAULT_IMPORT_FILE_MODULE_OPTIONS } from "../i-import-file-module";
-import { Signal } from "@preact/signals-core";
+import { signal, Signal } from "@preact/signals-core";
 import { isWorkerSupported } from "@/shared/utils/isWorkerSupported";
 
 export type { ImportFileModuleOptions as StreamConfig, StreamControls, StreamResult };
@@ -20,9 +20,12 @@ export class ImportFilePapaparseModule implements IImportFileModule {
   private logger: LoggerModule;
   private config: ImportFileModuleOptions;
 
-  private progressSignal = new Signal<number | null>(null);
+  progress = signal<number | null>(null);
 
-  private totalRowsEstimated = new Signal<number | null>(null);
+  private totalEstimatedRowsSignal = new Signal<number | null>(null);
+  get totalEstimatedRows() {
+    return this.totalEstimatedRowsSignal;
+  }
 
   constructor(logger: LoggerModule, config: ImportFileModuleOptions = {}) {
     this.logger = logger;
@@ -35,15 +38,11 @@ export class ImportFilePapaparseModule implements IImportFileModule {
     this.logger.log("ImportFilePapaparseModule initialized", "debug", "constructor", this.id);
   }
 
-  get progress() {
-    return this.progressSignal.value;
-  }
-
-  readFileStream = (file: File, signal?: AbortSignal): [ReadableStream, Signal<number | null>] => {
+  readFileStream = (file: File, signal?: AbortSignal): ReadableStream => {
     const validationResult = validateFile(file, this.config);
     if (validationResult?.isValid) {
       const stream = this.createDataStream(file, signal);
-      return [stream, this.totalRowsEstimated];
+      return stream;
     } else {
       this.logger.log(
         "Validation failed: " + validationResult?.message || "File validation failed",
@@ -60,13 +59,15 @@ export class ImportFilePapaparseModule implements IImportFileModule {
   createDataStream(file: File, signal?: AbortSignal) {
     this.logger.log("Creating data stream", "debug", "createDataStream", this.id);
 
-    this.totalRowsEstimated.value = 0;
+    this.totalEstimatedRowsSignal.value = 0;
 
     let totalRowsProcessed = 0;
 
     let parserInstance: any = null;
     const fileSize = file.size;
     const startTime = Date.now();
+
+    let lastProgress = 0;
 
     const stream = new ReadableStream({
       start: (controller) => {
@@ -84,12 +85,13 @@ export class ImportFilePapaparseModule implements IImportFileModule {
           chunkSize: this.config.chunkSize,
           dynamicTyping: false,
           skipEmptyLines: true,
-          chunk: (results, parser) => {
+          chunk: async (results, parser) => {
             signal?.throwIfAborted();
             parserInstance = parser;
 
+            parser.pause();
+
             const bytesRead = results.meta.cursor;
-            const progress = (bytesRead / fileSize) * 100;
 
             this.logger.log(
               `Chunk read: ${results.data.length} rows`,
@@ -97,21 +99,20 @@ export class ImportFilePapaparseModule implements IImportFileModule {
               "createDataStream",
               this.id
             );
-            this.logger.updateStatus({
-              order: 1,
-              progress: Math.round(progress * 100) / 100,
-              status: "running",
-              step: "createDataStream",
-            });
 
             totalRowsProcessed += results.data.length;
 
             if (results.data.length) {
               const aproxRowSize = bytesRead / totalRowsProcessed;
-              this.totalRowsEstimated.value = Math.floor(fileSize / aproxRowSize);
+              this.totalEstimatedRowsSignal.value = Math.floor(fileSize / aproxRowSize);
             }
 
-            this.progressSignal.value = progress;
+            const progress = (bytesRead / fileSize) * 100;
+            const rounded = Math.floor(progress / 5) * 5;
+            if (rounded > lastProgress) {
+              lastProgress = rounded;
+              this.progress.value = Math.min(Number(progress.toFixed(2)), 100);
+            }
 
             controller.enqueue({
               rows: results.data,
@@ -124,9 +125,7 @@ export class ImportFilePapaparseModule implements IImportFileModule {
               },
             });
 
-            if (controller.desiredSize !== null && controller.desiredSize <= 0) {
-              parser.pause();
-            }
+            parserInstance?.resume();
           },
           complete: () => {
             this.logger.log("File read complete", "debug", "createDataStream", this.id);
@@ -137,31 +136,20 @@ export class ImportFilePapaparseModule implements IImportFileModule {
               step: "createDataStream",
             });
             controller.close();
-            this.totalRowsEstimated.value = totalRowsProcessed;
-            this.progressSignal.value = null;
+            this.totalEstimatedRowsSignal.value = totalRowsProcessed;
+            this.progress.value = null;
           },
           error: (err) => {
             this.logger.log(
               `Error reading file: ${err.message}`,
               "error",
-              "createDataStream",
+              "importingData",
               this.id
             );
-            this.logger.updateStatus({
-              order: 1,
-              progress: 0,
-              status: "error",
-              step: "createDataStream",
-            });
+
             controller.error(err);
           },
         });
-      },
-      pull: (controller) => {
-        signal?.throwIfAborted();
-        if (parserInstance) {
-          parserInstance.resume();
-        }
       },
       cancel: () => parserInstance?.abort(),
     });

@@ -3,8 +3,6 @@ import type { IPersistenceModule } from "@/core/persistence/i-persistence-module
 import type { IViewerModule, EditRowPayload, ViewerModuleOptions } from "../i-viewer-module";
 import type { RowFilter } from "@/shared/schemes/persistent-filter";
 import type { RowObject } from "@/shared/schemes/row-object";
-import type { FileMetrics } from "@/shared/schemes/file-metrics";
-import type { ValidationError } from "@/shared/schemes/local-step-validators";
 
 export class ViewerModule implements IViewerModule {
   id: string = "viewer-native";
@@ -24,7 +22,6 @@ export class ViewerModule implements IViewerModule {
 
   getRowsWithPagination = async (
     persistenceModule: IPersistenceModule,
-    metrics: FileMetrics,
     filter?: RowFilter,
     pageNumber?: number,
     signal?: AbortSignal
@@ -55,12 +52,6 @@ export class ViewerModule implements IViewerModule {
       const reader = rowsStream.getReader();
 
       const rows: RowObject[] = [];
-      const totalRows = metrics.totalRows;
-      const totalPages = Math.ceil(totalRows / this.options.defaultPageSize);
-
-      if (pageNumber > totalPages && totalPages > 0) {
-        pageNumber = totalPages;
-      }
 
       try {
         while (true) {
@@ -73,31 +64,7 @@ export class ViewerModule implements IViewerModule {
         reader.releaseLock();
       }
 
-      const errors: ValidationError[] = [];
-      const errorsStream = persistenceModule.getErrorsStream({
-        fromRowId: innerFilter.fromRowId,
-        toRowId: innerFilter.toRowId,
-      });
-      const errorsReader = errorsStream.getReader();
-
-      try {
-        while (true) {
-          const { done, value } = await errorsReader.read();
-          if (done) break;
-          errors.push(...value.errors);
-        }
-      } finally {
-        errorsReader.releaseLock();
-      }
-
-      return {
-        rows,
-        errors,
-        totalRows,
-        pageSize: this.options.defaultPageSize,
-        currentPage: pageNumber,
-        totalPages,
-      };
+      return rows;
     } catch (error) {
       this.logger.log(
         `Error fetching rows with pagination: ${(error as Error).message}`,
@@ -142,32 +109,6 @@ export class ViewerModule implements IViewerModule {
         `Error editing row: ${(error as Error).message}`,
         "error",
         "editRow",
-        this.id
-      );
-      throw error;
-    }
-  };
-
-  removeRow = async (
-    persistenceModule: IPersistenceModule,
-    rowId: number,
-    signal?: AbortSignal
-  ): Promise<void> => {
-    try {
-      this.logger.log(`Removing row ${rowId}`, "debug", "removeRow", this.id);
-
-      const rowToRemove = await persistenceModule.getRowById(rowId);
-      await persistenceModule.deleteRow(rowId);
-      await persistenceModule.deleteErrors([rowId]);
-
-      await persistenceModule.updateMetrics();
-
-      this.logger.log(`Row ${rowId} removed from persistence`, "debug", "removeRow", this.id);
-    } catch (error) {
-      this.logger.log(
-        `Error removing rows: ${(error as Error).message}`,
-        "error",
-        "removeRows",
         this.id
       );
       throw error;

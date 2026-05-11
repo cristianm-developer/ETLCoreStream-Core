@@ -1,6 +1,7 @@
 import type { LayoutBase } from "@/shared/schemes/layout-base";
 import type { RowObject } from "@/shared/schemes/row-object";
 import type { ValidationError } from "@/shared/schemes/local-step-validators";
+import type { Signal } from "@preact/signals-core";
 
 export type LocalStepsEngineModuleOptions = {
   maxErrorCount?: number;
@@ -19,15 +20,15 @@ export type LocalStepResult = {
 };
 
 export interface ILocalStepsEngineModule {
-  progress: number | null;
+  progress: Signal<number | null>;
 
   handleStream: (
     stream: ReadableStream,
     layout: LayoutBase,
-    totalRowEstimated: number,
+    totalRowEstimated: Signal<number | null>,
     signal?: AbortSignal,
     step?: string,
     order?: number
-  ) => Promise<ReadableStream>;
+  ) => ReadableStream;
   updateOptions(options: Partial<LocalStepsEngineModuleOptions>): void;
 }

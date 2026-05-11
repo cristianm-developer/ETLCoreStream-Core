@@ -5,8 +5,9 @@ import type { RowObject } from "@/shared/schemes/row-object";
 export const AsyncValidateDataExample = (): GlobalStepValidator => ({
   name: "AsyncValidateDataExample",
   fn: async (rows: RowObject[], ..._args: any[]) => {
+    const headerKey = "headerKey";
     const validationResults = await validateDataExample(
-      rows.map((row) => ({ id: row.__rowId, value: row.value["headerKey"], row }))
+      rows.map((row) => ({ id: row.__rowId, value: row.value[headerKey], row }))
     );
 
     const validationErrors: ValidationError[] = validationResults
@@ -16,8 +17,8 @@ export const AsyncValidateDataExample = (): GlobalStepValidator => ({
         headerKey: "headerKey",
         validationCode: result.validationCode,
         message: result.message || "Error de validación",
-        value: result.value,
-        originalValue: result.originalValue,
+        value: rows.find((row) => row.__rowId === result.id)?.value,
+        originalValue: rows.find((row) => row.__rowId === result.id)?.__originalValue,
         step: "AsyncValidateDataExample",
       }));
 

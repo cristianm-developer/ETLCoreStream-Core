@@ -8,7 +8,7 @@ export interface ImportFileModuleOptions {
 }
 
 export const DEFAULT_IMPORT_FILE_MODULE_OPTIONS: ImportFileModuleOptions = {
-  chunkSize: 1024 * 1024 * 30,
+  chunkSize: 1024 * 1024 * 2,
   worker: true,
   allowedMimetypes: [
     "text/csv",
@@ -34,7 +34,8 @@ export interface StreamResult {
 }
 
 export interface IImportFileModule {
-  readFileStream: (file: File, signal?: AbortSignal) => [ReadableStream, Signal<number | null>];
-  progress: number;
+  readFileStream: (file: File, signal?: AbortSignal) => ReadableStream;
+  progress: Signal<number | null>;
+  totalEstimatedRows: Signal<number | null>;
   updateOptions(options: Partial<ImportFileModuleOptions>): void;
 }

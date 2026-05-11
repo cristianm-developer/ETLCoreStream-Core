@@ -8,17 +8,15 @@ import type { LoggerModule } from "@/core/logger/logger-native/main";
 import type { GlobalStepTransform } from "@/shared/schemes/global-step-transform";
 import type { GlobalStepValidator } from "@/shared/schemes/global-step-validator";
 import type { ValidationError } from "@/shared/schemes/local-step-validators";
-import { Signal } from "@preact/signals-core";
+import type { Signal } from "@preact/signals-core";
+import { signal } from "@preact/signals-core";
+import { yieldControl } from "@/shared";
 
 export class GlobalStepsEngineModule implements IGlobalStepsEngineModule {
   private id: string = "global-steps-engine";
   private logger: LoggerModule;
-  private progressSignal = new Signal<number | null>(null);
   private options: GlobalStepsEngineModuleOptions;
-
-  get progress() {
-    return this.progressSignal.value;
-  }
+  progress = signal<number | null>(null);
 
   constructor(logger: LoggerModule, options: GlobalStepsEngineModuleOptions) {
     this.logger = logger;
@@ -29,12 +27,12 @@ export class GlobalStepsEngineModule implements IGlobalStepsEngineModule {
   handleStep = (
     stream: ReadableStream<{ rows: RowObject[] }>,
     step: GlobalStep,
-    totalRowsEstimated: number | null,
+    totalRowsEstimated: Signal<number | null>,
     signal?: AbortSignal
   ): ReadableStream<{ rows: RowObject[]; errors: ValidationError[]; removedErrors: number[] }> => {
     signal?.throwIfAborted();
 
-    this.progressSignal.value = 0;
+    this.progress.value = 0;
     let totalRowsProcessed = 0;
     const transformer = new TransformStream<
       { rows: RowObject[] },
@@ -49,13 +47,17 @@ export class GlobalStepsEngineModule implements IGlobalStepsEngineModule {
         controller.enqueue(resultStream);
 
         if (totalRowsEstimated !== null) {
-          this.progressSignal.value = Math.round((totalRowsProcessed / totalRowsEstimated) * 100);
+          this.progress.value = Math.round(
+            (totalRowsProcessed / (totalRowsEstimated?.value ?? 0)) * 100
+          );
         } else {
-          this.progressSignal.value = null;
+          this.progress.value = null;
         }
+
+        await yieldControl();
       },
       flush: async () => {
-        this.progressSignal.value = null;
+        this.progress.value = null;
       },
     });
 
@@ -75,7 +77,7 @@ export class GlobalStepsEngineModule implements IGlobalStepsEngineModule {
     const removedErrors: number[] = [];
 
     for (const order of step.order) {
-      signal?.throwIfAborted();      
+      signal?.throwIfAborted();
 
       if (order === "transforms") {
         for (const transform of step.transforms || []) {
@@ -104,14 +106,15 @@ export class GlobalStepsEngineModule implements IGlobalStepsEngineModule {
   ): Promise<{ validationErrors: ValidationError[]; removedValidationErrors: number[] }> {
     signal?.throwIfAborted();
 
-    const result = await validator.fn(rows, ...validator.args || []);
+    const result = await validator.fn(rows, ...(validator.args || []));
 
     result.removedValidationErrors.forEach((removedValidationError) => {
       rows[removedValidationError].__isError = undefined;
     });
 
     result.validationErrors.forEach((validationError) => {
-      rows[validationError.__rowId].__isError = `${validationError.headerKey}:${validationError.validationCode}`;
+      rows[validationError.__rowId].__isError =
+        `${validationError.headerKey}:${validationError.validationCode}`;
     });
 
     return {
@@ -126,7 +129,7 @@ export class GlobalStepsEngineModule implements IGlobalStepsEngineModule {
     signal?: AbortSignal
   ): Promise<void> {
     signal?.throwIfAborted();
-    await transform.fn(rows, ...transform.args || []);
+    await transform.fn(rows, ...(transform.args || []));
   }
 
   updateOptions(options: Partial<GlobalStepsEngineModuleOptions>): void {

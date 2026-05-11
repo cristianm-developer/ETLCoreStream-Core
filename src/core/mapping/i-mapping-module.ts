@@ -1,5 +1,6 @@
 import type { LayoutBase } from "@/shared/schemes/layout-base";
 import type { LayoutHeader } from "@/shared/schemes/layout-header";
+import type { Signal } from "@preact/signals-core";
 
 export type RemapFn = (rowKeys: string[], headers: LayoutHeader[]) => Promise<[string, string][]>;
 
@@ -19,11 +20,11 @@ export const DEFAULT_MAP_HEADERS_OPTIONS: MappingModuleOptions = {
 };
 
 export interface IMappingModule {
-  progress: number | null;
+  progress: Signal<number | null>;
   handleStream: (
     stream: ReadableStream,
     layout: LayoutBase,
-    totalRowEstimated: number,
+    totalRowEstimated: Signal<number | null>,
     signal?: AbortSignal,
     step?: string,
     order?: number

@@ -20,7 +20,7 @@ export type ValidationError = {
   headerKey: string;
   validationCode: string;
   message?: string;
-  value?: string;
-  originalValue?: string;
+  value?: Record<string, any>;
+  originalValue?: Record<string, any>;
   step: string;
 };
