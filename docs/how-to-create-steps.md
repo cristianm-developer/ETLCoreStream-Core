@@ -1,136 +1,105 @@
 # How to create Steps (local & global)
 
-This document describes how to define and use Local and Global steps in a layout. Steps group validation and transform logic into stages. Each layout can contain multiple local steps and multiple global steps. Use the examples in `src/examples/layout/layout-example.ts` as a reference implementation.
+This document describes the current shape and usage for Local and Global steps in a layout. Steps group validation and transform logic into stages. Each layout can contain multiple local steps and multiple global steps. See the example layout at `src/examples/layout/layout-example.ts`.
 
 Key points
 
 - A "step" bundles transforms and validators for a single stage.
-- The `order` field controls whether transforms run before validators or vice-versa.
-- A stage can include multiple validators and multiple transforms.
-- Local steps run sequentially per-row (streamed). Global steps run at the end (chunked) and can query external data.
+- `order` is an array that controls the execution groups sequence (e.g. `["transforms","validators"]`).
+- A step can include multiple transforms and multiple validators.
+- Local steps run row-by-row (streaming style). Global steps run after streaming, in chunks, and may query external/context data.
 
 Layout step types
 
 Local step shape
 
-See the Local step type:
+Refer to the Local step type:
 
-```5:11:src/shared/schemes/layout-local-step.ts
+```11:41:src/shared/schemes/layout-local-step.ts
 export type LayoutLocalStep = {
-    id: string;
-    name: string;
-    description: string;
-    order: 'transforms' | 'validators'[];
-    transforms?: LocalStepTransform[];
-    validators?: LocalStepValidator[];
-}
+  id: string;
+  name: string;
+  description?: string;
+  order: ("transforms" | "validators")[];
+  transforms?: LocalStepTransform[];
+  validators?: LocalStepValidator[];
+};
 ```
 
 How local steps work
 
-- Local steps are executed sequentially, row-by-row. Each row is passed through the layout's `localSteps` in order.
-- Within a single local step the runtime follows the `order` array: if `['transforms','validators']` then transforms run first, then validators.
-- All configured transforms and validators in that step are executed (there can be many).
-- When a row is edited, it will flow again through all local steps to re-validate and re-transform consistently.
+- Local steps are executed sequentially for each row. Each row flows through the layout's `localSteps` in order.
+- `order` is an array of group names; the engine runs groups in the listed sequence (e.g. `["transforms","validators"]`).
+- Transforms should perform pure transformations; validators should inspect and return validation results (no side effects).
+- When a row is edited it is reprocessed through all local steps so transforms and validators produce consistent output.
 
-Example (from layout example — local steps):
+Example (local step in the example layout):
 
-```71:79:src/examples/layout/layout-example.ts
-  localSteps: [
+```48:56:src/examples/layout/layout-example.ts
     {
-      id: 'name-processing',
-      name: 'Name Processing',
-      description: 'Clean, trim, and validate name field',
-      order: ['transforms', 'validators'],
-      transforms: [trim('name')],
-      validators: [minLength('name', 2), maxLength('name', 100)],
+      id: "name-processing",
+      name: "Name Processing",
+      description: "Cleaning and normalization of the name field",
+      order: ["transforms", "validators"] as any,
+      transforms: [],
+      validators: [],
     },
 ```
 
 Global step shape
 
-See the Global step type:
+Refer to the Global step type:
 
-```7:16:src/shared/schemes/layout-global-step.ts
+```12:47:src/shared/schemes/layout-global-step.ts
 export type GlobalStep = {
-    name: string;
-    order: 'transforms' | 'validators'[];
-    reprocessAllRowsOnChange: boolean;
-    filter: {
-        rows: RowFilter;
-        errors: ErrorFilter;
-    }
-    transforms?: GlobalStepTransform[];
-    validators?: GlobalStepValidator[];
-}
+  name: string;
+  description?: string;
+  order: ("transforms" | "validators")[];
+  reprocessAllRowsOnChange?: boolean;
+  filter: {
+    rows: RowFilter;
+  };
+  transforms?: GlobalStepTransform[];
+  validators?: GlobalStepValidator[];
+};
 ```
 
 How global steps work
 
-- Global steps are executed after the streaming/local processing phase — they run as "end of processing" stages over the dataset.
-- Global steps operate in chunks (not per-row in a streaming sense). For each chunk the step can:
-  - apply a row filter (e.g., only rows where `phone` is not null or `age > 18`), and
-  - apply error filters so the step targets only rows with specific error conditions.
-- The engine will perform the necessary queries (one per step or per chunk depending on implementation) to fetch external/context data used by that step. The query results feed the step's validators/transforms.
-- `reprocessAllRowsOnChange` controls whether a change in that global step's data should cause reprocessing of all rows (useful when a global lookup changes).
+- Global steps run after local/stream processing as end-of-processing stages over matching rows (chunks).
+- Each global step can apply a row filter so it only runs on a subset of rows, and may use external/context data to perform validations or transforms.
+- `reprocessAllRowsOnChange` (when true) signals that changes in the global step's data should trigger reprocessing of all rows.
+- Be cautious with chunk sizes and external queries to avoid performance/memory issues.
 
-Example (from layout example — global steps and filter):
+Example (global step in the example layout):
 
-```118:127:src/examples/layout/layout-example.ts
-  globalSteps: [
+```68:76:src/examples/layout/layout-example.ts
     {
-      name: 'Global Validation Step',
-      order: ['validators'],
+      description: "Global validation step",
+      name: "Global Validation Step",
+      order: ["validators"],
       reprocessAllRowsOnChange: true,
       filter: {
         rows: { withErrors: false },
-        errors: {},
       },
-      validators: [AsyncValidateDataExample()],
+      validators: [],
     },
 ```
 
 Design notes & best practices
 
-- Prefer small, focused steps: keep each step responsible for a cohesive piece of logic (e.g., "normalize country", "validate email format").
-- Use `order` to avoid running expensive validations before cheap, necessary transforms that normalize data (trim, extract digits, map dictionaries).
-- Local steps are ideal for per-row normalization and fast synchronous checks.
-- Global steps are ideal for lookups, enrichment, cross-row validations, or any validation/transform that needs aggregated or external data.
-- When writing global validators/transforms be mindful of chunk sizes and filters to avoid unnecessary queries and keep memory/performance bounded.
-- If your global step depends on an external dataset that updates independently, set `reprocessAllRowsOnChange` thoughtfully.
+- Keep steps small and focused (one responsibility per step).
+- Use `order` to ensure necessary normalizations happen before validations.
+- Prefer local steps for synchronous per-row normalization and checks.
+- Use global steps for enrichment, lookups, cross-row validations, or when validators need aggregated/external data.
 
 Troubleshooting
 
-- If edits are not reflected, ensure local steps are wired and the pipeline replays edited rows through all local steps.
-- If global validations seem stale, verify filters and `reprocessAllRowsOnChange` settings and that the global query returns expected results.
+- If local edits are not applied, verify `localSteps` presence and that edited rows are replayed through the pipeline.
+- If global validations look stale, verify filters and `reprocessAllRowsOnChange`, and that any external queries return expected results.
 
 Additional references
 
-- Example layout with several local and global steps:
+- Example layout: `src/examples/layout/layout-example.ts`
 
-```118:139:src/examples/layout/layout-example.ts
-  globalSteps: [
-    {
-      name: 'Global Validation Step',
-      order: ['validators'],
-      reprocessAllRowsOnChange: true,
-      filter: {
-        rows: { withErrors: false },
-        errors: {},
-      },
-      validators: [AsyncValidateDataExample()],
-    },
-    {
-      name: 'Global Transform Step',
-      order: ['transforms'],
-      reprocessAllRowsOnChange: false,
-      filter: {
-        rows: { withErrors: false },
-        errors: {},
-      },
-      transforms: [AsyncTransformDataExample()],
-    },
-  ] as GlobalStep[],
-```
-
-If you want, I can add a short template snippet you can paste into a new layout or add a checklist for implementing a new step.
+If you'd like, I can also add a one-line template you can paste when creating a new step or a short checklist for implementing steps.

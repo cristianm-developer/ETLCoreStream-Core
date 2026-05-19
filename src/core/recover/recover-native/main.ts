@@ -15,7 +15,7 @@ export class RecoverNativeModule implements IRecoverModule {
   constructor(logger: LoggerModule, options: RecoverModuleOptions = {}) {
     this.logger = logger;
     this.options = { ...DEFAULT_RECOVER_MODULE_OPTIONS, ...options };
-    this.availableLayouts = this.options.availableLayouts;
+    this.availableLayouts = this.options.availableLayouts ?? [];
   }
 
   setAvailableLayouts(layout: LayoutBase[]): Promise<void> {

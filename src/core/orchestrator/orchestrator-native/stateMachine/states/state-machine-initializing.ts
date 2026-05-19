@@ -23,7 +23,7 @@ export const stateMachineInitializing = mainStateMachineSetup.createStateConfig(
         ),
         assign({ step: ({ context }) => [...(context.step ?? []), STEPS.INITIALIZING_MACHINE] }),
         assign(({ context }) => ({
-          checkRecoverPoint: context.settings.recover.checkRecoveryPoint ?? false,
+          checkRecoverPoint: context.settings!.recover!.checkRecoveryPoint ?? false,
         })),
       ],
       always: [
@@ -66,8 +66,8 @@ export const stateMachineInitializing = mainStateMachineSetup.createStateConfig(
             src: "loadRecoverPointHandler",
             input: ({ context }: { context: OrchestratorContext }) =>
               ({
-                recoverModule: context.modules.recover,
-                persistenceModule: context.modules.persistence,
+                recoverModule: context.modules!.recover!,
+                persistenceModule: context.modules!.persistence!,
               }) satisfies LoadRecoveryPointInput,
             onDone: {
               actions: assign({
@@ -149,7 +149,7 @@ export const stateMachineInitializing = mainStateMachineSetup.createStateConfig(
                 recoverModule: context.modules!.recover!,
                 persistenceModule: context.modules!.persistence!,
                 viewerModule: context.modules!.viewer!,
-                recoveryPoint: context.recoveryPoint,
+                recoveryPoint: context.recoveryPoint!,
               }) satisfies RecoverPointHandlerInput,
             onDone: {
               actions: assign({

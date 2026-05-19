@@ -55,7 +55,7 @@ export const globalStepsHandler = fromCallback<
       if (layout.globalSteps?.length === 0) {
         const rowsResult = await viewModule.getRowsWithPagination(
           persistingModule,
-          null,
+          undefined,
           1,
           abortSignal
         );

@@ -39,8 +39,8 @@ export const ValidateLayoutHeaders = (headers: LayoutHeader[], row: any) => {
   const headersToValidate = headers.map((h) => ({
     validKeys: new Set(
       h.caseSensitive
-        ? [h.key, ...h.alternativeKeys]
-        : [h.key.toLowerCase(), ...h.alternativeKeys.map((k) => k.toLowerCase())]
+        ? [h.key, ...(h.alternativeKeys || [])]
+        : [h.key.toLowerCase(), ...(h.alternativeKeys || []).map((k) => k.toLowerCase())]
     ),
     required: h.required,
     caseSensitive: h.caseSensitive,
@@ -81,7 +81,7 @@ export const ValidateLayoutHeaders = (headers: LayoutHeader[], row: any) => {
 const ValidateLayoutHeadersUniqueness = (headers: LayoutHeader[]) => {
   const allKeys = headers.flatMap((h) => [
     h.key.toLowerCase(),
-    ...h.alternativeKeys.map((k) => k.toLowerCase()),
+    ...(h.alternativeKeys || []).map((k) => k.toLowerCase()),
   ]);
 
   const duplicates = allKeys.filter((item, i) => allKeys.indexOf(item) !== i);

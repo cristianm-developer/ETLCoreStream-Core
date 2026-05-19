@@ -72,7 +72,7 @@ export class ViewerModule implements IViewerModule {
       }
 
       const result = await persistenceModule.getRowsPaginated({
-        filter,
+        filter: filter ?? {},
         limit: this.options.defaultPageSize,
         cursor,
         direction,

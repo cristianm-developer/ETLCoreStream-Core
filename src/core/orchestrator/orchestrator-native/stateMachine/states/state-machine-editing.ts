@@ -82,12 +82,12 @@ export const stateMachineEditing = mainStateMachineSetup.createStateConfig({
 
           return {
             exportId: event.id,
-            layout: context.layout,
+            layout: context.layout!,
             target: event.exportTarget,
             persistenceModule: context.modules!.persistence!,
             exporterModule: context.modules!.exporter!,
             filter: context.viewPaginationInfo?.currentFilter ?? {},
-            file: context.file,
+            file: context.file!,
             abortSignal: context.abortController.signal,
           } satisfies ExporterHandlerInput;
         },
@@ -172,9 +172,9 @@ export const stateMachineEditing = mainStateMachineSetup.createStateConfig({
             src: "editingRowHandler",
             input: ({ context }: { context: OrchestratorContext }) => {
               return {
-                rowId: context.editPayload?.rowId,
-                key: context.editPayload?.key,
-                value: context.editPayload?.value,
+                rowId: context.editPayload!.rowId!,
+                key: context.editPayload!.key!,
+                value: context.editPayload!.value!,
                 persistenceModule: context.modules!.persistence!,
                 viewerModule: context.modules!.viewer!,
                 abortSignal: context.abortController.signal,
@@ -197,7 +197,7 @@ export const stateMachineEditing = mainStateMachineSetup.createStateConfig({
             src: "localStepPipeHandler",
             input: ({ context }: { context: OrchestratorContext }) => {
               return {
-                rowId: context.editPayload?.rowId,
+                rowId: context.editPayload?.rowId ?? 0,
                 localStepEngineModule: context.modules!.localStepEngine!,
                 persistenceModule: context.modules!.persistence!,
                 layout: context.layout!,
@@ -221,10 +221,10 @@ export const stateMachineEditing = mainStateMachineSetup.createStateConfig({
             src: "globalStepPipeHandler",
             input: ({ context }: { context: OrchestratorContext }) => {
               return {
-                rowId: context.editPayload?.rowId,
+                rowId: context.editPayload!.rowId!,
                 globalStepEngineModule: context.modules!.globalStepEngine!,
                 persistenceModule: context.modules!.persistence!,
-                layout: context.layout,
+                layout: context.layout!,
                 abortSignal: context.abortController.signal,
               } satisfies GlobalStepPipeHandlerInput;
             },

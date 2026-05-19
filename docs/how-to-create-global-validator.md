@@ -4,12 +4,15 @@ Global validators evaluate a chunk of rows at once and should return validation 
 
 Important rules
 
-- Signature: `fn(rows: RowObject[], ...args: any[])` — receives a chunk and optional `args`.
-- Return shape: return either a list of validation results or an object like `{ validationErrors, removedValidationErrors }` where `validationErrors` contains `ValidationError` entries referencing `__rowId`.
+-- Signature: `fn(rows: RowObject[], ...args: any[])` — receives a chunk and optional `args`.
+-- Return shape: MUST return an object with the form `{ validationErrors: ValidationError[], removedValidationErrors: number[] }`.
+Each `ValidationError` must reference `__rowId` for the row it applies to.
+
 - Chunking: the validator runs once per chunk. Do not assume you have the whole dataset in `rows`.
 - Avoid per-row external calls: batch inputs from the chunk, perform a single API/DB call, and map responses back to rows.
-- Use `args` for caches, dictionaries, accumulators, or helper functions that persist across chunks.
-- Validators should be side-effect free with respect to row shape — they report errors rather than mutating row values.
+  -- Use `args` for caches, dictionaries, accumulators, or helper functions that persist across chunks.
+  -- Validators should be side-effect free with respect to row shape — they report errors rather than mutating row values.
+  -- Optionally you can set `errorCode` in the validator configuration; when provided the engine may overwrite returned errors' `validationCode` with this value.
 
 Example (implementation in this repo):
 

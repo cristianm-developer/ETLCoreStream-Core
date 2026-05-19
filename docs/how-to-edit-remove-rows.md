@@ -1,5 +1,207 @@
 # How to edit or remove rows during processing
 
+This document explains the interactive edit/remove flows when the orchestrator reaches the editing stage. It translates the orchestrator's state-machine and public API into practical UI recommendations and integration points.
+
+Target references:
+
+- State machine: `src/core/orchestrator/orchestrator-native/stateMachine/states/state-machine-editing.ts`
+- Orchestrator surface (signals & actions): `src/core/orchestrator/orchestrator-native/main.ts`
+- Viewer module (row editing contract): `src/core/viewer/i-viewer-module.ts`
+
+## When editing is available
+
+The orchestrator exposes a working "editing" stage. When that stage is active the state machine adds a marker step indicating it's ready to receive user interactions. In the implementation the `"idle"` substate of the editing stage indicates the UI may allow edits, removals and exports.
+
+Practical check (UI): enable edit/remove controls when the orchestrator's `step` signal/observable contains the editing idle step (STEPS.EDITING.IDLE).
+
+## Orchestrator public API (what the UI calls)
+
+The OrchestratorModule exposes both Observables/Signals and action methods for consumers. Key methods you will call from the UI:
+
+- selectFile(file: File)
+- selectLayout(layout: LayoutBase)
+- changeViewFilter(filter: RowFilter | null)
+- changeViewPage(pageNumber: number)
+- removeRow(rowId: number)
+- editRow(rowId: number, key: string, value: string)
+- export(id: string, target: "Stream" | "File")
+- reset()
+- cleanPersistence()
+
+You can find these implementations in the orchestrator class where the methods send user events to the state machine.
+
+Example: methods that send user events to the machine:
+
+```e:/Developing/Web/Personal/Components/ETLCoreStream-core/src/core/orchestrator/orchestrator-native/main.ts
+  removeRow = (rowId: number): void => {
+    this.actor!.send({ type: "REMOVE_ROW", rowId } as RemoveRowEvent);
+  };
+  export = (id: string, target: "Stream" | "File"): void => {
+    this.actor!.send({ type: "EXPORT", id, exportTarget: target } as ExportEvent);
+  };
+  editRow = (rowId: number, key: string, value: string): void => {
+    this.actor!.send({ type: "EDIT_ROW", rowId, key, value } as EditRowEvent);
+  };
+```
+
+## Viewer module contract (editing)
+
+If your UI relies on the viewer module to perform edits or fetch paginated rows, use the viewer contract:
+
+```e:/Developing/Web/Personal/Components/ETLCoreStream-core/src/core/viewer/i-viewer-module.ts
+export type EditRowPayload = {
+  rowId: number;
+  headerKeyEdited: string;
+  newValue: any;
+};
+
+export interface IViewerModule {
+  getRowsWithPagination(...): Promise<RowObject[]>;
+  editRow(persistenceModule, payload: EditRowPayload, signal?): Promise<void>;
+  ...
+}
+```
+
+The orchestrator's editing handlers invoke the viewer/persistence/local/global step modules during an edit cycle; the UI should call the orchestrator's `editRow(...)` method rather than calling the viewer directly (the orchestrator orchestrates the reprocessing).
+
+## Edit flow (what happens after UI calls editRow)
+
+Sequence (high-level):
+
+1. UI calls `orchestrator.editRow(rowId, key, value)` after user confirmation.
+2. The state machine receives `EDIT_ROW` and records an edit payload in the context.
+3. The machine runs a short pipeline:
+   - `editingData` (editingRowHandler) — applies the raw edit (viewer/persistence interaction).
+   - `localStepPipe` — re-runs local steps (transforms/validators) for the edited row.
+   - `globalStepPipe` — optionally re-runs global steps that affect aggregated outputs.
+4. The machine then invokes the metrics updating handler and recover-point update, then returns to the editing idle state.
+
+Relevant state machine fragment (shows the edit lifecycle and payload assignment):
+
+```e:/Developing/Web/Personal/Components/ETLCoreStream-core/src/core/orchestrator/orchestrator-native/stateMachine/states/state-machine-editing.ts
+150:    editingRow: {
+151:      entry: [
+152:        raise(({ self }) => logEventGen.info(self, "Editing row", STEPS.EDITING.EDITING_ROW)),
+153:        assign({ processingRows: true }),
+154:        assign(({ event, context }) => {
+155:          if (event.type !== "EDIT_ROW") {
+156:            return context;
+157:          }
+158:          return {
+159:            editPayload: {
+160:              rowId: event.rowId,
+161:              key: event.key,
+162:              value: event.value,
+163:            },
+164:          };
+165:        }),
+166:        assign({ step: ({ context }) => [...context.step, STEPS.EDITING.EDITING_ROW] }),
+```
+
+And the pipeline that follows:
+
+```e:/Developing/Web/Personal/Components/ETLCoreStream-core/src/core/orchestrator/orchestrator-native/stateMachine/states/state-machine-editing.ts
+170:      states: {
+171:        editingData: {
+172:          invoke: {
+173:            src: "editingRowHandler",
+174:            ...
+191:            onDone: {
+192:              target: "localStepPipe",
+193:            },
+194:        },
+195:        localStepPipe: {
+196:          invoke: { src: "localStepPipeHandler", ... },
+214:            onDone: {
+215:              target: "globalStepPipe",
+216:            },
+217:        },
+218:        globalStepPipe: {
+221:            src: "globalStepPipeHandler",
+238:            onDone: {
+239:              target: "#root.working.editing.updatingMetrics",
+240:            },
+241:        },
+```
+
+Notes for UIs:
+
+- The UI must confirm the edit with the user before calling `editRow(...)`.
+- By default only local steps are re-run; global steps are part of the standard pipeline but behavior can be configured in your integration.
+- After the pipeline finishes the orchestrator updates `metrics`, `currentRows` and pagination info.
+
+## Remove flow (what happens after UI calls removeRow)
+
+Sequence:
+
+1. UI calls `orchestrator.removeRow(rowId)` (confirm with the user).
+2. State machine enters `removingRow` and invokes the removingRowsHandler which removes the row from persistence.
+3. When removal completes the machine triggers metrics update, recover point update, and returns to idle.
+
+Relevant snippet:
+
+```e:/Developing/Web/Personal/Components/ETLCoreStream-core/src/core/orchestrator/orchestrator-native/stateMachine/states/state-machine-editing.ts
+113:    removingRow: {
+119:      invoke: {
+120:        src: "removingRowsHandler",
+121:        input: ({ context, event }: { context: OrchestratorContext; event: RemoveRowEvent }) => {
+122:          if (event.type !== "REMOVE_ROW") {
+123:            throw new Error("Invalid event type");
+124:          }
+126:          return {
+127:            rowId: event.rowId,
+128:            persistenceModule: context.modules!.persistence!,
+129:          } satisfies RemovingRowsHandlerInput;
+130:        },
+138:        onDone: {
+139:          target: "#root.working.editing.updatingMetrics",
+140:        },
+141:      },
+```
+
+## Export and reset
+
+- Calling `orchestrator.export(id, target)` sends an EXPORT event and the machine will run the exporter handler while the editing stage switches to an exporting substate.
+- Calling `orchestrator.reset()` will abort the current actor, stop the machine and reinitialize a fresh instance. `cleanPersistence()` clears persisted data if the UI needs that option.
+
+## Observables / Signals to subscribe to from the UI
+
+Use the OrchestratorModule's Subjects/Signals to render live UI state:
+
+- context$ / context (signal)
+- state$ / state
+- metrics$ / metrics
+- layout$ / layout
+- file$ / file
+- currentRows$ / currentRows
+- currentErrors$ / currentErrors
+- step$ / step (array of step markers)
+- viewPaginationInfo$ / viewPaginationInfo
+- viewFilter$ / viewFilter
+
+These are available as both RxJS Observables and @preact/signals computed values in the OrchestratorModule implementation.
+
+## UI recommendations
+
+- Only call `editRow(...)` or `removeRow(...)` after the user explicitly confirms the intention.
+- Disable navigation / editing controls unless the orchestrator's `step` includes the editing idle marker (STEПS.EDITING.IDLE).
+- Show an inline edit UI with explicit Confirm/Cancel. On confirm call `editRow(...)`.
+- After edits/removals complete, refresh the visible page (call `changeViewPage(currentPage)` if pagination changed) and show a brief success notification.
+- Indicate whether edits will re-run global steps (if your integration allows toggling this).
+
+## Example integration checklist
+
+- Subscribe to `step$`, `context$`, `metrics$`, and `currentRows$` to render UI and enable/disable controls.
+- Confirm with the user before calling `editRow(rowId, key, value)` or `removeRow(rowId)`.
+- After actions complete, refresh the view and read `viewPaginationInfo` / `metrics` to update counts and pages.
+- Use `cleanPersistence()` or `reset()` when the user wants to start over.
+
+---
+
+File updated to align with the current orchestrator state-machine and public API. See referenced source files for the exact handler and step names.
+
+# How to edit or remove rows during processing
+
 This document describes the interactive workflow when the orchestrator finishes processing an input file and waits for user actions (edit, remove, export, or reset). It also explains how to consume the orchestrator API in `src/core/orchestrator/i-orchestrator-module.ts` to implement the UI and actions.
 
 ## End-of-processing / waiting-for-user state

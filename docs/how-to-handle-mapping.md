@@ -1,23 +1,44 @@
 # How to handle Mapping
 
-This document explains how the mapping module works and the options you can pass to control remapping behavior. The runtime exposes an interface and options in `src/core/mapping/i-mapping-module.ts` that the core mapping flow uses.
+This document explains how the mapping module works and how to implement the remapping callback the runtime will call when it needs a user-provided mapping. The module surface is defined in `src/core/mapping/i-mapping-module.ts` and exposes the `RemapFn` type and `MappingModuleOptions` you should wire into the module.
 
-Reference (options and defaults):
+Reference (interface and defaults):
 
-```5:18:e:/Developing/Web/Personal/Components/ETL CoreStream/src/core/mapping/i-mapping-module.ts
+```1:35:src/core/mapping/i-mapping-module.ts
+import type { LayoutBase } from "@/shared/schemes/layout-base";
+import type { LayoutHeader } from "@/shared/schemes/layout-header";
+import type { Signal } from "@preact/signals-core";
+
+export type RemapFn = (rowKeys: string[], headers: LayoutHeader[]) => Promise<[string, string][]>;
+
 export type MappingModuleOptions = {
-    allowRemapColumns: boolean;
-    ignoreRemapUnrequired: boolean;
-    restCount?: number;
-    onRemapFn?: (rowKeys: string[], headers: LayoutHeader[]) => Promise<[string, string][]>;
-    preserveOriginalValue: boolean;
-}
+  allowRemapColumns: boolean;
+  ignoreRemapUnrequired: boolean;
+  restCount?: number;
+  onRemapFn?: RemapFn;
+  preserveOriginalValue: boolean;
+};
 
 export const DEFAULT_MAP_HEADERS_OPTIONS: MappingModuleOptions = {
-    allowRemapColumns: false,
-    ignoreRemapUnrequired: false,
-    restCount: 10000,
-    preserveOriginalValue: false,
+  allowRemapColumns: false,
+  ignoreRemapUnrequired: false,
+  restCount: 10000,
+  preserveOriginalValue: false,
+};
+
+export interface IMappingModule {
+  progress: Signal<number | null>;
+  handleStream: (
+    stream: ReadableStream,
+    layout: LayoutBase,
+    totalRowEstimated: Signal<number | null>,
+    signal?: AbortSignal,
+    step?: string,
+    order?: number
+  ) => Promise<ReadableStream>;
+
+  handleRemap: (layout: LayoutBase, row: any, signal?: AbortSignal) => Promise<[string, string][]>;
+  updateOptions(options: Partial<MappingModuleOptions>): void;
 }
 ```
 
@@ -28,25 +49,70 @@ Key concepts
   - `headers: LayoutHeader[]` — detected layout headers the system knows about.
     It must return a Promise resolving to an array of tuples `[sourceKey, targetKey]` describing how incoming keys map to internal header ids.
 
-Example onRemapFn:
+Implementing the remap callback (RemapFn)
 
-```typescript
-async function askUserForMap(rowKeys: string[], headers: LayoutHeader[]) {
-  // Example: match by name or ask UI. Return pairs [incomingKey, headerId]
+The module calls a function matching `RemapFn` whenever it needs a mapping dictionary. The function must return a Promise that resolves to an array of tuples: `[incomingKey, targetHeaderId]`.
+
+Note: each tuple follows the order `[originalKey, mappedHeaderId]` — the first element is the original key from the incoming row (incoming/original), and the second element is the internal header id the core should map that key to.
+
+Below are two practical, non-React examples you can use as reference. The first is a simple heuristic auto-matcher; the second shows how to hook a programmatic prompt (Node CLI) when heuristics are ambiguous.
+
+Heuristic auto-matcher
+
+```javascript
+// Simple heuristic: match incoming keys to headers by label (case-insensitive),
+// fall back to returning the same key so the core can decide.
+async function autoRemap(rowKeys, headers) {
   return rowKeys.map((rk) => {
-    const match = headers.find((h) => h.label?.toLowerCase() === rk.toLowerCase());
-    return [rk, match ? match.id : rk]; // fallback to same key if unsure
-  }) as [string, string][];
+    const match = headers.find((h) => {
+      if (!h.label) return false;
+      return String(h.label).trim().toLowerCase() === String(rk).trim().toLowerCase();
+    });
+    return [rk, match ? match.id : rk];
+  });
 }
 ```
 
-- allowRemapColumns (boolean): When true, the mapping flow will allow/attempt remapping of columns. If false, remapping is skipped and headers are applied as-is.
+Programmatic prompt (Node CLI) for ambiguous keys
 
-- ignoreRemapUnrequired (boolean): When true the module will skip prompting/asking for remap if the input already meets the minimum requirements for headers. If the input does not meet the minimum (missing required headers or obvious mismatches), it will invoke `onRemapFn` (or other remap UI) to request a mapping.
+```javascript
+// This example uses Node's readline to ask the operator for mappings when
+// heuristics didn't find an obvious match. It returns a Promise that resolves
+// to the mapping pairs.
+const readline = require("readline");
 
-- preserveOriginalValue (boolean): When enabled the module keeps the original cell value alongside the remapped/normalized value so downstream steps or exports can display or use both. Use this when you want to show the raw input in the item row or keep it for auditing.
+function ask(question) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) =>
+    rl.question(question, (ans) => {
+      rl.close();
+      resolve(ans);
+    })
+  );
+}
 
-- restCount (number, optional): Controls chunking/pausing frequency — the core yields (pauses to flush or allow UI updates) after roughly `restCount` processed rows. The default in the codebase is 10000; tune this lower for interactive flows or larger for throughput.
+async function promptRemap(rowKeys, headers) {
+  const heuristics = await autoRemap(rowKeys, headers);
+  const result = [];
+
+  for (let i = 0; i < rowKeys.length; i++) {
+    const [rk, mapped] = heuristics[i];
+    if (mapped !== rk) {
+      result.push([rk, mapped]);
+      continue;
+    }
+
+    // Ask operator to choose a header id or accept the incoming key
+    const headerList = headers.map((h) => `${h.id}:${h.label}`).join(", ");
+    const answer = await ask(
+      `Map incoming key "${rk}" — available headers: ${headerList}\nEnter header id (or blank to keep "${rk}"): `
+    );
+    result.push([rk, answer ? answer.trim() : rk]);
+  }
+
+  return result;
+}
+```
 
 Where this plugs in
 
@@ -54,31 +120,29 @@ Where this plugs in
 
 Practical recommendations
 
-- Provide a robust `onRemapFn` that can do best-effort auto-matching (by label, case-insensitive keys, or heuristics) and fall back to a UI prompt for ambiguous cases.
-- If you expect users to want to see the raw input, enable `preserveOriginalValue` so exports or item rows can reference the original text.
+- Provide a robust `onRemapFn` that can do best-effort auto-matching (by label, case-insensitive keys, or heuristics) and fall back to a prompt for ambiguous cases.
+- If you expect operators to want to see the raw input, enable `preserveOriginalValue` so exports or item rows can reference the original text.
 - Start with `restCount` lower (e.g., 1000) during development or interactive demos, then raise it for large batch processing.
 - Use `allowRemapColumns` to gate remapping behavior in automated pipelines — set to false when you want strict header enforcement.
 - Set `ignoreRemapUnrequired` to true if you want the mapping to stay silent unless something clearly fails validation.
 
-Example: wiring options into a mapping invocation
+Programmatic wiring (non-React)
 
-```typescript
-const mappingOptions: MappingModuleOptions = {
+```javascript
+// Acquire the mapping module from the provider (example API — adapt to your app)
+// const mappingModule = provider.getModule('mapper');
+
+// Set options with your RemapFn implementation
+mappingModule.updateOptions({
   allowRemapColumns: true,
-  ignoreRemapUnrequired: false,
-  restCount: 2000,
-  onRemapFn: askUserForMap,
+  onRemapFn: promptRemap, // or autoRemap
   preserveOriginalValue: true,
-};
+  restCount: 2000,
+});
 
-const outStream = await mappingModule.handleStream(
-  inStream,
-  layout,
-  estimatedTotal,
-  abortSignal,
-  "map-step",
-  0
-);
+// When streaming, the module will call your RemapFn as needed.
+// You can also remap a single row manually:
+// const manualMap = await mappingModule.handleRemap(layout, someRow);
 ```
 
-That's it — supply `onRemapFn` to control the mapping dictionary, toggle `allowRemapColumns` / `ignoreRemapUnrequired` to control when remap prompts happen, use `preserveOriginalValue` if you need the raw input preserved, and tune `restCount` for chunk/yield behavior.
+That's it — supply `onRemapFn` (a `RemapFn`) to control the mapping dictionary, let `allowRemapColumns` gate whether remapping is attempted at all, use `ignoreRemapUnrequired` to skip prompts when input already satisfies requirements, enable `preserveOriginalValue` when the raw cell should be kept, and tune `restCount` for chunk/yield behavior.

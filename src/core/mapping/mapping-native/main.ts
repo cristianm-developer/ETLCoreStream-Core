@@ -225,8 +225,8 @@ export class MappingModule implements IMappingModule {
         : rowKeys.map((key) => [key, key.toLowerCase()]);
 
       const availablesHeaders = h.caseSensitive
-        ? [h.key, ...h.alternativeKeys]
-        : [h.key.toLowerCase(), ...h.alternativeKeys.map((key) => key.toLowerCase())];
+        ? [h.key, ...(h.alternativeKeys || [])]
+        : [h.key.toLowerCase(), ...(h.alternativeKeys || []).map((key) => key.toLowerCase())];
 
       const entry = rowsToValidate.find((k) => availablesHeaders.includes(k[1]));
       if (entry) {

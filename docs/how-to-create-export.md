@@ -4,7 +4,7 @@ Use the example exports in `src/examples/exports/exports-example.ts` as referenc
 
 Core idea
 
-- Each export is an object with at least a `fn` function that receives a `RowObject` and returns the transformed/exportable object (or `null` to skip the row).
+- Each export is an object (an `Exporter`) with at least a `name` and a `fn` function that receives a `RowObject` and returns the transformed/exportable object (or `null` to skip the row). Exports are registered as an array of `Exporter` entries (see `src/shared/schemes/exporter.ts`).
 - The system processes rows one-by-one but emits them in chunks via a stream so you can aggregate, buffer, or forward batches.
 - Optionally provide a `callback` that receives the export stream (a ReadableStream) to process aggregated data (e.g., group, post to an API, or write CSV).
 
@@ -12,6 +12,7 @@ Minimal export shape
 
 ```typescript
 export const MyExport = {
+  name: "MyExport",
   fn: (row: RowObject) => ({
     // build the result object from the incoming row
     id: row.__rowId,

@@ -117,13 +117,13 @@ export class OrchestratorModule implements IOrchestratorModule {
   private id!: string;
   private provider!: ProviderModule;
   private logger!: ILoggerModule;
-  private actor!: ActorRefFrom<ReturnType<typeof createMachine>>;
+  private actor?: ActorRefFrom<ReturnType<typeof createMachine>>;
   private machine!: ReturnType<typeof createMachine>;
 
   private subscriptions = new Subscription();
 
   private checkInitialContext = (context: OrchestratorContext) => {
-    if (Object.entries(context.modules).some(([k, v]) => !v)) {
+    if (Object.entries(context.modules!).some(([k, v]) => !v)) {
       throw new Error(`Module initialization is incomplete`);
     }
   };

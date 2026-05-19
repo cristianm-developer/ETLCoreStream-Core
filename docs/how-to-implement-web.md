@@ -57,11 +57,12 @@ import { ETLBrowserOrchestrator } from "src/examples/modules/browser-preset";
 import { ContactManagementLayout } from "src/examples/layout/layout-example";
 
 // 1) create orchestrator with tuned options
+// NOTE: the BrowserProviderPreset accepts the shape defined in
+// `BrowserProviderConfig` (see src/examples/modules/browser-preset.ts).
 const orchestrator = ETLBrowserOrchestrator({
   importer: {
-    // recommended: 1-10 MB for memory-constrained devices
-    chunkSize: 1024 * 1024 * 5,
-    worker: true,
+    // property names follow the BrowserProviderConfig exposed by the preset
+    importerChunkSize: 1024 * 1024 * 5, // 5 MB recommended for low-memory devices
     allowedMimetypes: ["text/csv", "text/plain"],
     maxFileSize: 1024 * 1024 * 50, // 50 MB
   },
@@ -69,9 +70,13 @@ const orchestrator = ETLBrowserOrchestrator({
     // how many rows saved per persistence chunk (affects IPC / DB ops)
     chunkSizeQtd: 50,
   },
+  viewer: {
+    // page size controlled by the preset; default is 100 if not provided
+    defaultPageSize: 50,
+  },
 });
 
-// 2) listen to state/progress/context to render UI
+// 2) listen to state/progress/context (IOrchestratorModule exposes these observables)
 orchestrator.state$.subscribe((state) => {
   console.log("orchestrator state:", state);
 });
@@ -98,7 +103,7 @@ input.onchange = () => {
 };
 document.body.appendChild(input);
 
-// 5) trigger an export (downloads CSV via exporter module)
+// 5) trigger an export (IOrchestratorModule.export(id, target))
 // use the export key defined in the layout (see layout.exports)
 // target 'File' will call exporter.exportToCsv and prompt download
 function exportCsv() {
@@ -112,10 +117,9 @@ Handling Stream exports (callback)
 
 Notes on configuration and tuning
 
-- importer.chunkSize (bytes): controls chunk size used by the file reader/parser. Larger values reduce overhead but increase memory usage. Defaults to 30MB in the examples. For low-memory devices choose 1–5 MB.
-- importer.worker (boolean): run parsing in a WebWorker to avoid blocking the UI. Recommended true for large files.
+- importer.importerChunkSize (bytes): controls chunk size used by the file reader/parser. Larger values reduce overhead but increase memory usage. Defaults are defined in DEFAULT_IMPORT_FILE_MODULE_OPTIONS (see src/core/import-file/i-import-file-module). For low-memory devices choose 1–5 MB.
 - importer.allowedMimetypes / maxFileSize: control allowed files and protect against huge uploads.
-- persistence.chunkSizeQtd (rows): number of rows grouped per persistence operation. Smaller values reduce memory but increase DB calls; defaults to 100.
+- persistence.chunkSizeQtd (rows): number of rows grouped per persistence operation. Smaller values reduce memory but increase DB calls; defaults are defined in DEFAULT_PERSISTENCE_MODULE_OPTIONS.
 - mapping options (see mapping defaults): control preserves, remapping behavior and async remapping hooks.
 - localStepEngine.maxErrorCount (or similar): stop-after thresholds for validation errors during local step processing.
 

@@ -1,12 +1,76 @@
 # How to create your own module
 
-This guide explains how to implement custom modules for ETL CoreStream, the supported module kinds, the contract they must follow, and notes about each interface in `src/core/*`.
+This guide explains how to implement custom modules for ETL CoreStream, the supported module kinds, the contracts (interfaces) they must respect, and practical notes about each interface in `src/core/*`.
 
 Summary
 
-- Module kinds: importer (import-file), mapping, persistence, local/global steps engine, viewer, exporter, logger, orchestrator/provider adapters.
-- Always implement the interfaces in `src/core/*` and register your implementation in the `ProviderModule`.
-- Stream-first design: prefer ReadableStream/TransformStream; support AbortSignal for cancellation and expose progress via Signal or callbacks.
+- Module kinds: importer (import-file), mapper (mapping), persistence, recover, local/global steps engine, viewer, exporter, logger, and orchestrator/provider adapters.
+- Respect typed interfaces in `src/core/*` — they are the runtime contracts the Orchestrator and other modules depend on.
+- Stream-first design: prefer ReadableStream/TransformStream; support AbortSignal for cancellation and expose progress via a Signal or callbacks.
+
+Module architecture — responsibilities and boundaries
+
+The system is composed of small interchangeable modules. Each module has a well-defined responsibility and must expose the exact surface described by its interface. Keep modules single-purpose and avoid leaking internal concerns across boundaries.
+
+- Importer (import-file): read raw input (files, blobs, streams) and expose a normalized ReadableStream of raw rows and a progress Signal. Validate incoming mimetypes and basic schema hints but do not perform mapping or persistence.
+- Mapper (mapping): transform raw rows into internal RowObject[] according to a `LayoutBase`. Must accept a stream and return a ReadableStream of mapped rows (and optionally metadata). Mapping must be deterministic and side-effect free.
+- Persistence: persist mapped rows, errors and metrics. Expose incremental persistence via saveStream and streaming reads (getRowsStream/getErrorsStream). Responsible for durability, optimistic concurrency, and efficient pagination.
+- Recover: (optional module) implement resumption and recovery strategies after partial failures (e.g., retry-backed offset commits, transactional checkpoints). If present, expose methods to register checkpoints and restore processing state.
+- Local steps engine: apply small, user-triggered transforms/validators to single rows or small batches. Designed for low-latency edits and should avoid heavy I/O.
+- Global steps engine: run batch transforms/validators across the whole dataset. Orchestrates multi-step pipelines, emits progress and error streams, and must support pausing/resuming if possible.
+- Viewer: provide paginated reads, search and light aggregation helpers using the persistence module. Viewer should never bypass persistence for writes.
+- Exporter: transform persisted rows into export formats (CSV, JSONL, etc.) and stream bytes out incrementally. Report progress and support cancellation so UIs can show live export progress.
+  -- Logger: centralized logging/status observable for UI and orchestrator. Use bounded buffers and provide queryable getLogs APIs.
+
+-- Orchestrator / ProviderModule: composition layer that wires implementations together, validates contracts at registration time, and exposes lifecycle and high-level actions to consumers.
+
+The Orchestrator sits between modules and is responsible for:
+
+- Composing module implementations into a cohesive runtime (importer -> mapper -> persistence -> viewer/exporter).
+- Validating module contracts at registration time and optionally performing a lightweight handshake.
+- Routing high-level actions (selectFile, startImport, runGlobalSteps, export) to the correct module sequence and handling progress/cancellation across module boundaries.
+- Exposing a friendly consumer API and reactive signals/observables for UI consumption.
+
+See how provider modules are re-exported in `src/core/provider/index.ts` for the entry point that the Orchestrator uses when wiring implementations.
+
+Interface contract rules — respect these to remain pluggable
+
+1. Exact types and method signatures: implement the interfaces in `src/core/*` exactly. The Orchestrator uses TypeScript typings at build time and expects the runtime shapes to match.
+2. Identity: every module implementation must expose a stable `id` string and any metadata declared by its interface.
+3. Stream shapes: clearly document and follow the stream chunk shapes (e.g., { rows: RowObject[] }, { rows, errors, removedErrors }). Do not emit unexpected fields.
+4. Errors: standardize error objects (code, message, context). Streams should surface errors in a defined shape; throwing exceptions may be used for fatal, unrecoverable conditions only.
+5. Cancellation and timeouts: accept an optional `AbortSignal` and stop work promptly when signaled. Clean up resources and close streams.
+6. Progress & observability: expose progress as a `Signal<number|null>` or via callbacks such as `onProgress(bytes, rows, percent)`. Emit early-first-chunk events where applicable.
+7. Idempotency and side-effects: operations that persist state should be idempotent when retried where possible. Mappers and local-step engines should be side-effect free.
+8. Validation at registration: ProviderModule should validate that required methods exist and optionally run a lightweight handshake (e.g., `ping()` or `version()` call) to ensure compatibility.
+9. Versioning and backward compatibility: when changing interfaces, prefer additive changes and provide adapters shims when possible.
+10. Resource limits: accept options like `chunkSize`, `maxFileSize`, and obey memory/IO limits (do not buffer entire datasets).
+
+Practical implementation notes
+
+- Registration example:
+
+```ts
+const provider = new ProviderModule({
+  modules: {
+    importer: new MyImporter(),
+    mapping: new MyMapper(),
+    persistence: new MyPersistence(),
+    exporter: new MyExporter(),
+    logger: new MyLogger(),
+    localStepEngine: new MyLocalSteps(),
+    globalStepEngine: new MyGlobalSteps(),
+    viewer: new MyViewer(),
+    recover: new MyRecover(), // optional
+  },
+});
+orchestrator.initialize(provider);
+```
+
+- Validate at startup: run a small behavioral test for critical flows (import -> map -> persist -> view) in CI to catch contract drift early.
+- Tests: unit-test streams with small synthetic ReadableStreams. Integration-test by registering the module in a ProviderModule and running orchestrator paths.
+- Documentation: document options, supported mimetypes, backpressure behavior, and side-effects.
+- Observability: expose metrics and make logs queryable so the Orchestrator can present useful diagnostics to users.
 
 Why follow the interface
 

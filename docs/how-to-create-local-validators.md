@@ -10,7 +10,9 @@ Contract
 
 - Must return an object containing at least:
   - `isValid: boolean`
-  - optionally: `validationCode`, `message`, `value`, `step`
+  - `validationCode: string` (short code identifying the validation outcome)
+  - optionally: `message`, `value`
+- May include extra metadata (e.g. `step`) but only `isValid` and `validationCode` are required by the type.
 - Should be side-effect free (do not mutate the row).
 - Must defensively check inputs (null/undefined) to avoid runtime errors.
 

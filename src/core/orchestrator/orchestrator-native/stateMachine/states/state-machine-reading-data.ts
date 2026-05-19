@@ -136,7 +136,7 @@ export const stateMachineReadingData = mainStateMachineSetup.createStateConfig({
               id: "importerHandlerActor",
               input: ({ context }: { context: OrchestratorContext }) =>
                 ({
-                  file: context.file,
+                  file: context.file!,
                   importerModule: context.modules!.importer!,
                   abortSignal: context.abortController.signal,
                 }) satisfies ImporterHandlerInput,
@@ -208,8 +208,8 @@ export const stateMachineReadingData = mainStateMachineSetup.createStateConfig({
                 ({
                   localStepEngine: context.modules!.localStepEngine!,
                   stream: context.streams.mappingStream!,
-                  layout: context.layout,
-                  totalEstimatedRows: context.totalEstimatedRows,
+                  layout: context.layout!,
+                  totalEstimatedRows: context.totalEstimatedRows!,
                   abortSignal: context.abortController.signal,
                 }) satisfies LocalStepsHandlerInput,
             }),
@@ -291,7 +291,7 @@ export const stateMachineReadingData = mainStateMachineSetup.createStateConfig({
                   layout: context.layout!,
                   totalEstimatedRows: context.totalEstimatedRows!,
                   viewModule: context.modules!.viewer!,
-                  viewPageSize: context.settings.viewer.defaultPageSize ?? 100,
+                  viewPageSize: context.settings!.viewer!.defaultPageSize ?? 100,
                   abortSignal: context.abortController.signal,
                 }) satisfies GlobalStepsHandlerInput,
             }),

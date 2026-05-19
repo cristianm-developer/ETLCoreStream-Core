@@ -8,9 +8,10 @@ Local transforms are applied per cell during the local-step pipeline. Each trans
 
 Contract
 
-- The transform function (`fn`) must return the transformed value for that cell.
-- Transforms should be pure and not mutate the original row.
-- They must defensively handle null/undefined values before calling methods like `.trim()` or `.replace()`.
+- The transform function (`fn`) MUST return the transformed value for that cell. Per the shared scheme, local transforms are expected to return a string (update the scheme if you need other types).
+- Transforms should be pure and must not mutate the original `row` object; return a new value instead.
+- Use the `args` property on the transform definition to pass dictionaries, predicate functions, or other static configuration; these args will be forwarded to `fn` when executed.
+- Always defensively handle null/undefined values (e.g., `if (value == null) return value;`) before calling string helpers like `.trim()` or `.replace()`.
 
 Examples (from repo)
 
@@ -23,11 +24,14 @@ Trim transform:
 export const trim = (headerKey: string): LocalStepTransform => ({
   headerKey,
   name: 'trim',
-  fn: (value: string, _row: any, ...args: any[]) => value.trim(),
+  fn: (value: string, _row: any, ...args: any[]) => {
+    if (value == null) return value;
+    return String(value).trim();
+  },
 });
 ```
 
-Dictionary mapping transform (uses args to pass the mapping dict):
+Dictionary mapping transform (uses `args` to pass the mapping dict):
 
 ```15:26:src/examples/steps/local/transforms/local-transforms.ts
 export const diccTransform = (
@@ -38,7 +42,8 @@ export const diccTransform = (
   name: 'diccTransform',
   fn: (value: string, _row: any, ...args: any[]) => {
     const mappingDict: Record<string, string> = args[0] ?? {};
-    return mappingDict[value] ?? value;
+    if (value == null) return value;
+    return mappingDict[String(value)] ?? value;
   },
   args: [dict],
 });
@@ -63,10 +68,10 @@ export const boolResult = (
 
 Best practices
 
-- Always guard against null/undefined before using string helpers.
-- Prefer pure functions that return a new value.
-- Use `args` to pass external dictionaries, lookup tables, or predicate functions.
-- Keep transforms small and composable — they are combined per `localStep` in layouts.
+- Always guard against null/undefined before using string helpers and convert values to string when appropriate.
+- Prefer pure functions that return a new value and avoid mutating `row`.
+- Use `args` to pass external dictionaries, lookup tables, or predicate functions; the engine will forward `transform.args` to your `fn`.
+- Keep transforms small and composable — they are combined per `localStep` in layouts. Respect the `order` defined in `LayoutLocalStep`; transforms run in the sequence specified by that step's `order`.
 
 Where to use
 

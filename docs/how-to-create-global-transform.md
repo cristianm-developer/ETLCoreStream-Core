@@ -4,9 +4,10 @@ Global transforms run on chunks of rows (an array of `RowObject`) and are invoke
 
 Important rules
 
-- Signature: `fn(rows: RowObject[], ...args: any[])` — the function receives the chunk and optional `args`.
-- Chunking: the transform is called once for each chunk of the dataset. Do not assume `rows` contains the entire file — it contains only the current chunk.
-- Row mutation: global transforms may update `row.value[...]` in-place (many examples in this repo mutate rows directly). If your transform returns data instead of mutating, follow the shared scheme contract.
+-- Signature: `fn(rows: RowObject[], ...args: any[])` — the function receives the chunk and optional `args`. The function is expected to be asynchronous and return `Promise<void>`.
+-- Chunking: the transform is called once for each chunk of the dataset. Do not assume `rows` contains the entire file — it contains only the current chunk.
+-- Row mutation: global transforms commonly mutate `row.value[...]` in-place and resolve when finished. If you prefer to return transformed data instead of mutating, ensure it follows the project's shared scheme for global transforms (but the canonical `GlobalStepTransform.fn` is `Promise<void>` mutating in-place).
+
 - Performance: avoid calling external APIs per-row. Instead gather inputs from the chunk, perform one bulk call, then map responses back to rows (use a Map keyed by `__rowId`).
 - State across chunks: to maintain accumulators, caches, or counters across chunks, pass an object via `args` (e.g., `{ cache: new Map(), counters: {} }`). This allows cross-chunk context without global variables.
 - Idempotence: design transforms so repeated runs or retries won't produce incorrect results.

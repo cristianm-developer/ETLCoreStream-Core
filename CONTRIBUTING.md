@@ -44,7 +44,7 @@ We welcome contributions in the following areas:
   - Implements the appropriate interface (`i-*.ts`)
   - Follows stream-based design principles
 - Tests are not required at this time; include examples or manual verification steps instead
- - Handles chunking and resource efficiency (see guidelines below)
+- Handles chunking and resource efficiency (see guidelines below)
 
 ### 4. **Adapter Creation**
 
@@ -117,6 +117,7 @@ If your contribution directly impacts **this repository's core**, follow these g
 Automated test cases are not currently used in this repository. Please do not add test files or enforce test coverage in PRs at this time.
 
 If you want to provide verification for your changes, include:
+
 - Code examples demonstrating the feature
 - Manual verification steps or a short checklist in the PR description
 - Performance notes or benchmarks when relevant

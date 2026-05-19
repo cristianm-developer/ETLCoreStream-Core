@@ -109,7 +109,7 @@ export class GlobalStepsEngineModule implements IGlobalStepsEngineModule {
     const result = await validator.fn(rows, ...(validator.args || []));
 
     if (validator.errorCode) {
-      result.validationErrors.forEach((e) => (e.validationCode = validator.errorCode));
+      result.validationErrors.forEach((e) => (e.validationCode = validator.errorCode!));
     }
 
     result.removedValidationErrors.forEach((removedValidationError) => {

@@ -217,7 +217,6 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
               message: result.message,
               value: cellValue,
               originalValue: row.__originalValue?.[headerKey],
-              step: step.name,
             };
             row.__isError = `${validator.headerKey}:${errorCode || result.validationCode}`;
             errorCount.count++;
@@ -231,7 +230,6 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
             message: (error as Error).message,
             value: cellValue,
             originalValue: row.__originalValue?.[headerKey] ?? undefined,
-            step: step.name,
           };
           errorCount.count++;
           row.__isError = `UNEXPECTED_ERROR - ${validator.headerKey}:${validator.name}`;

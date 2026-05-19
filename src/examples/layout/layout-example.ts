@@ -21,7 +21,6 @@ export const LayoutExample: LayoutBase = {
       example: "Jane Doe",
       required: true,
       default: "",
-      order: 1,
     },
     {
       key: "email",
@@ -32,7 +31,6 @@ export const LayoutExample: LayoutBase = {
       example: "jane@example.com",
       required: true,
       default: "",
-      order: 2,
     },
     {
       key: "phone",
@@ -43,7 +41,6 @@ export const LayoutExample: LayoutBase = {
       example: "+1 555 1234",
       required: false,
       default: "",
-      order: 3,
     },
   ],
 

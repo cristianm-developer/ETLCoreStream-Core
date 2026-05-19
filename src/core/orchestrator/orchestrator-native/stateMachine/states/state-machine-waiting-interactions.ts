@@ -189,7 +189,7 @@ export const stateMachineWaitingInteractions = mainStateMachineSetup.createState
         input: ({ context }: { context: OrchestratorContext }) =>
           ({
             persistingModule: context.modules!.persistence!,
-            file: context.file,
+            file: context.file!,
             viewerModule: context.modules!.viewer!,
             filter: context.viewPaginationInfo?.currentFilter ?? {},
           }) satisfies MetricsUpdatingHandlerInput,

@@ -122,13 +122,14 @@ npm install @etl-corestream/core
 
 ETL CoreStream ships with a browser-oriented preset architecture that provides a ready-to-use ETL pipeline using:
 
-* PapaParse importer
-* IndexedDB persistence
-* Recovery engine
-* Validation engines
-* Export system
-* Reactive viewer
-* Stream processing pipeline
+- PapaParse importer
+- IndexedDB persistence
+- Recovery engine
+- Validation engines
+- Export system
+- Reactive viewer
+- Stream processing pipeline
+
 ## Quick Example
 
 ```ts
@@ -184,10 +185,7 @@ await orchestrator.selectFile(file);
 orchestrator.editRow(rowId, "email", "new@email.com");
 
 // Export anytime
-await orchestrator.export(
-  "Export Just Name and Email",
-  "File"
-);
+await orchestrator.export("Export Just Name and Email", "File");
 ```
 
 The entire pipeline remains reactive and non-blocking during processing.
@@ -200,16 +198,16 @@ ETL CoreStream uses layouts to define how files should be interpreted and proces
 
 Layouts define:
 
-* Headers
-* Header aliases
-* Header remapping
-* Required fields
-* Local validators
-* Local transforms
-* Global validators
-* Global transforms
-* Export rules
-* Entity creation logic
+- Headers
+- Header aliases
+- Header remapping
+- Required fields
+- Local validators
+- Local transforms
+- Global validators
+- Global transforms
+- Export rules
+- Entity creation logic
 
 ```ts
 export const LayoutExample: LayoutBase = {
@@ -217,8 +215,7 @@ export const LayoutExample: LayoutBase = {
 
   name: "Contact Management Layout",
 
-  description:
-    "Example layout for processing contact information",
+  description: "Example layout for processing contact information",
 
   allowUndefinedColumns: false,
 
@@ -246,15 +243,9 @@ export const LayoutExample: LayoutBase = {
 
       order: ["transforms", "validators"],
 
-      transforms: [
-        trim("email"),
-        toLowerCase("email"),
-      ],
+      transforms: [trim("email"), toLowerCase("email")],
 
-      validators: [
-        required("email"),
-        email("email"),
-      ],
+      validators: [required("email"), email("email")],
     },
   ],
 
@@ -264,9 +255,7 @@ export const LayoutExample: LayoutBase = {
 
       order: ["validators"],
 
-      validators: [
-        AsyncValidateDataExample(),
-      ],
+      validators: [AsyncValidateDataExample()],
     },
   ],
 
@@ -308,9 +297,7 @@ Common use cases where ETL CoreStream excels:
 Local transforms run at row level and are ideal for normalization and lightweight transformations.
 
 ```ts
-export const toLowerCase = (
-  headerKey: string
-): LocalStepTransform => ({
+export const toLowerCase = (headerKey: string): LocalStepTransform => ({
   headerKey,
 
   name: "toLowerCase",
@@ -318,9 +305,7 @@ export const toLowerCase = (
   fn: (value: string) => value.toLowerCase(),
 });
 
-export const trim = (
-  headerKey: string
-): LocalStepTransform => ({
+export const trim = (headerKey: string): LocalStepTransform => ({
   headerKey,
 
   name: "trim",
@@ -331,11 +316,11 @@ export const trim = (
 
 Perfect for:
 
-* String normalization
-* Cleanup
-* Parsing
-* Date formatting
-* Entity preparation
+- String normalization
+- Cleanup
+- Parsing
+- Date formatting
+- Entity preparation
 
 ---
 
@@ -344,21 +329,14 @@ Perfect for:
 Local validators run synchronously for immediate row-level feedback.
 
 ```ts
-export const minValue = (
-  headerKey: string,
-  min: number
-): LocalStepValidator => ({
+export const minValue = (headerKey: string, min: number): LocalStepValidator => ({
   headerKey,
 
   name: "Min Value",
 
   args: [min],
 
-  fn: (
-    value: string,
-    row: any,
-    minVal: number
-  ) => {
+  fn: (value: string, row: any, minVal: number) => {
     const numValue = parseFloat(value);
 
     const isValid = numValue >= minVal;
@@ -368,9 +346,7 @@ export const minValue = (
 
       validationCode: "MIN_VALUE",
 
-      message: !isValid
-        ? `Value must be at least ${minVal}`
-        : undefined,
+      message: !isValid ? `Value must be at least ${minVal}` : undefined,
 
       value,
 
@@ -382,11 +358,11 @@ export const minValue = (
 
 Ideal for:
 
-* Required validations
-* Numeric ranges
-* Regex validation
-* Formatting checks
-* Immediate UI feedback
+- Required validations
+- Numeric ranges
+- Regex validation
+- Formatting checks
+- Immediate UI feedback
 
 ---
 
@@ -395,49 +371,45 @@ Ideal for:
 Global validators can run asynchronously and integrate directly with APIs or backend services.
 
 ```ts
-export const AsyncValidateDataExample =
-  (): GlobalStepValidator => ({
-    name: "AsyncValidateDataExample",
+export const AsyncValidateDataExample = (): GlobalStepValidator => ({
+  name: "AsyncValidateDataExample",
 
-    fn: async (rows: RowObject[]) => {
-      const validationResults =
-        await validateDataExample(
-          rows.map((row) => ({
-            id: row.__rowId,
-            value: row.value["headerKey"],
-          }))
-        );
+  fn: async (rows: RowObject[]) => {
+    const validationResults = await validateDataExample(
+      rows.map((row) => ({
+        id: row.__rowId,
+        value: row.value["headerKey"],
+      }))
+    );
 
-      return {
-        validationErrors:
-          validationResults
-            .filter((result) => !result.isValid)
-            .map((result) => ({
-              __rowId: result.id,
+    return {
+      validationErrors: validationResults
+        .filter((result) => !result.isValid)
+        .map((result) => ({
+          __rowId: result.id,
 
-              headerKey: "headerKey",
+          headerKey: "headerKey",
 
-              validationCode:
-                result.validationCode,
+          validationCode: result.validationCode,
 
-              message: result.message,
+          message: result.message,
 
-              step: "AsyncValidateDataExample",
-            })),
+          step: "AsyncValidateDataExample",
+        })),
 
-        removedValidationErrors: [],
-      };
-    },
-  });
+      removedValidationErrors: [],
+    };
+  },
+});
 ```
 
 This enables:
 
-* Backend-aware validation
-* Batch validation APIs
-* Database checks
-* Cross-row validation
-* External business rule engines
+- Backend-aware validation
+- Batch validation APIs
+- Database checks
+- Cross-row validation
+- External business rule engines
 
 ---
 
@@ -446,42 +418,37 @@ This enables:
 Global transforms allow asynchronous dataset-wide transformations.
 
 ```ts
-export const AsyncTransformDataExample =
-  (): GlobalStepTransform => ({
-    name: "AsyncTransformDataExample",
+export const AsyncTransformDataExample = (): GlobalStepTransform => ({
+  name: "AsyncTransformDataExample",
 
-    fn: async (rows: RowObject[]) => {
-      const transformedItems =
-        await transformDataExample(
-          rows.map((row) => ({
-            id: row.__rowId,
-            value: row.value["headerKey"],
-          }))
-        );
+  fn: async (rows: RowObject[]) => {
+    const transformedItems = await transformDataExample(
+      rows.map((row) => ({
+        id: row.__rowId,
+        value: row.value["headerKey"],
+      }))
+    );
 
-      const rowMap = new Map(
-        rows.map((r) => [r.__rowId, r])
-      );
+    const rowMap = new Map(rows.map((r) => [r.__rowId, r]));
 
-      transformedItems.forEach((item) => {
-        const row = rowMap.get(item.id);
+    transformedItems.forEach((item) => {
+      const row = rowMap.get(item.id);
 
-        if (row) {
-          row.value["headerKey"] =
-            item.value;
-        }
-      });
-    },
-  });
+      if (row) {
+        row.value["headerKey"] = item.value;
+      }
+    });
+  },
+});
 ```
 
 Perfect for:
 
-* Backend enrichment
-* AI processing
-* Data normalization
-* Entity synchronization
-* Cross-dataset transformations
+- Backend enrichment
+- AI processing
+- Data normalization
+- Entity synchronization
+- Cross-dataset transformations
 
 ---
 
@@ -491,21 +458,21 @@ ETL CoreStream supports persistent ETL sessions.
 
 Imports can continue after:
 
-* Browser refreshes
-* Crashes
-* Tab closures
-* Interrupted processing
+- Browser refreshes
+- Crashes
+- Tab closures
+- Interrupted processing
 
 Users can edit imported rows while processing continues in the background.
 
 ## Persistence Capabilities
 
-* Resume interrupted imports
-* Restore previous sessions
-* Persist partially processed datasets
-* Incremental reprocessing
-* Editable persisted data
-* Recoverable ETL workflows
+- Resume interrupted imports
+- Restore previous sessions
+- Persist partially processed datasets
+- Incremental reprocessing
+- Editable persisted data
+- Recoverable ETL workflows
 
 ```ts
 const orchestrator = ETLBrowserOrchestrator({
@@ -527,28 +494,25 @@ Long-running imports become safe, recoverable, and interactive.
 
 ETL CoreStream exporters can export directly to:
 
-* Files
-* Streams
-* APIs
-* Cloud providers
-* Custom destinations
+- Files
+- Streams
+- APIs
+- Cloud providers
+- Custom destinations
 
 The exporter system can also expose a `ReadableStream` directly, allowing you to consume transformed data without implementing a custom exporter.
 
 ```ts
-await orchestrator.export(
-  "Export Just Name and Email",
-  "Stream"
-);
+await orchestrator.export("Export Just Name and Email", "Stream");
 ```
 
 This makes it possible to:
 
-* Pipe exports to APIs
-* Upload directly to cloud storage
-* Send data through WebSockets
-* Stream data into another ETL pipeline
-* Build custom exporters externally
+- Pipe exports to APIs
+- Upload directly to cloud storage
+- Send data through WebSockets
+- Stream data into another ETL pipeline
+- Build custom exporters externally
 
 ---
 
@@ -557,21 +521,20 @@ This makes it possible to:
 Typical processing flow inside ETL CoreStream:
 
 File
- ↓
+↓
 Importer
- ↓
+↓
 Mapper
- ↓
+↓
 Local Steps Engine (row-level transforms & validators)
- ↓
+↓
 Persistence (chunked storage / indexedDB)
- ↓
+↓
 Global Steps Engine (dataset-level transforms & validators)
- ↓
+↓
 Exporter / Viewer
 
 This diagram highlights the runtime flow from raw file input to export/view output and clarifies where modules can be swapped.
-
 
 # 🏗️ Architecture Overview
 
@@ -633,17 +596,17 @@ Every internal module can be replaced.
 
 Including:
 
-* Orchestrator
-* Importer
-* Mapper
-* Persistence
-* Recover module
-* Viewer
-* Logger
-* Exporter
-* Local Steps Engine
-* Global Steps Engine
-The `Provider` is the composition root of the system. It is responsible for dependency injection, module registration, and orchestration wiring.
+- Orchestrator
+- Importer
+- Mapper
+- Persistence
+- Recover module
+- Viewer
+- Logger
+- Exporter
+- Local Steps Engine
+- Global Steps Engine
+  The `Provider` is the composition root of the system. It is responsible for dependency injection, module registration, and orchestration wiring.
 
 As long as interfaces are respected, any module can be replaced with a custom implementation.
 
@@ -662,8 +625,7 @@ const provider = new ProviderModule({
   },
 });
 
-const orchestrator =
-  new CustomOrchestratorModule();
+const orchestrator = new CustomOrchestratorModule();
 
 orchestrator.initialize(provider);
 ```
@@ -676,17 +638,17 @@ This allows developers to build entirely custom ETL ecosystems while preserving 
 
 ETL CoreStream exposes reactive state through:
 
-* RxJS Observables
-* Preact Signals
+- RxJS Observables
+- Preact Signals
 
 Compatible with:
 
-* React
-* Vue
-* Angular
-* Svelte
-* SolidJS
-* Vanilla JS
+- React
+- Vue
+- Angular
+- Svelte
+- SolidJS
+- Vanilla JS
 
 ```ts
 orchestrator.state$.subscribe(console.log);
@@ -708,30 +670,30 @@ ETL CoreStream is designed for massive datasets and constrained environments.
 
 ## Memory
 
-* Constant memory footprint
-* Chunk-based processing
-* Stream pipelines
-* Lazy pagination
-* Minimal duplication
+- Constant memory footprint
+- Chunk-based processing
+- Stream pipelines
+- Lazy pagination
+- Minimal duplication
 
 ## CPU
 
-* Non-blocking processing
-* UI-safe architecture
-* Incremental updates
-* Background pipelines
+- Non-blocking processing
+- UI-safe architecture
+- Incremental updates
+- Background pipelines
 
 ## Storage
 
-* Indexed persistence
-* Recoverable sessions
-* Incremental synchronization
+- Indexed persistence
+- Recoverable sessions
+- Incremental synchronization
 
 ## Network
 
-* Async backend integration
-* Chunked transfers
-* Cancellable operations
+- Async backend integration
+- Chunked transfers
+- Cancellable operations
 
 ---
 
@@ -741,20 +703,19 @@ While many browser ETL tools crash or freeze processing large datasets, ETL Core
 
 Users can:
 
-* Navigate pages
-* Edit rows
-* Trigger exports
-* Apply filters
-* Continue working
+- Navigate pages
+- Edit rows
+- Trigger exports
+- Apply filters
+- Continue working
 
 Even while background processing is still running.
 
 ## Benchmark (example)
 
-| Rows | File Size | Memory Usage | UI Freeze |
-| ---- | --------- | ------------ | --------- |
-| 1,000,000 | 1GB | ~constant | No |
-
+| Rows      | File Size | Memory Usage | UI Freeze |
+| --------- | --------- | ------------ | --------- |
+| 1,000,000 | 1GB       | ~constant    | No        |
 
 ---
 
@@ -762,17 +723,17 @@ Even while background processing is still running.
 
 | Capability               | ETL CoreStream | Traditional Browser ETL |
 | ------------------------ | -------------- | ----------------------- |
-| Stream processing        | ✅              | ❌                       |
-| Constant memory usage    | ✅              | ❌                       |
-| Resumable imports        | ✅              | ❌                       |
-| Editable datasets        | ✅              | ❌                       |
-| Async backend validation | ✅              | ⚠️                      |
-| Reactive state           | ✅              | ❌                       |
-| Modular architecture     | ✅              | ⚠️                      |
-| Replaceable orchestrator | ✅              | ❌                       |
-| Real-time revalidation   | ✅              | ❌                       |
-| Persistent sessions      | ✅              | ❌                       |
-| Stream exports           | ✅              | ❌                       |
+| Stream processing        | ✅             | ❌                      |
+| Constant memory usage    | ✅             | ❌                      |
+| Resumable imports        | ✅             | ❌                      |
+| Editable datasets        | ✅             | ❌                      |
+| Async backend validation | ✅             | ⚠️                      |
+| Reactive state           | ✅             | ❌                      |
+| Modular architecture     | ✅             | ⚠️                      |
+| Replaceable orchestrator | ✅             | ❌                      |
+| Real-time revalidation   | ✅             | ❌                      |
+| Persistent sessions      | ✅             | ❌                      |
+| Stream exports           | ✅             | ❌                      |
 
 ---
 
@@ -782,13 +743,13 @@ ETL CoreStream is environment-agnostic.
 
 Build adapters for:
 
-* Browsers
-* Node.js
-* Deno
-* Docker
-* Kubernetes
-* Edge Workers
-* Microservices
+- Browsers
+- Node.js
+- Deno
+- Docker
+- Kubernetes
+- Edge Workers
+- Microservices
 
 One orchestration engine, multiple environments.
 
@@ -800,20 +761,20 @@ Detailed guides and examples are available in `/docs`.
 
 Topics include:
 
-* Creating layouts
-* Header mapping
-* Local validators
-* Local transforms
-* Global validators
-* Global transforms
-* Exporters
-* Persistence engines
-* Browser implementations
-* Recovery systems
-* Async pipelines
-* Editing workflows
-* Custom orchestrators
-* Custom modules
+- Creating layouts
+- Header mapping
+- Local validators
+- Local transforms
+- Global validators
+- Global transforms
+- Exporters
+- Persistence engines
+- Browser implementations
+- Recovery systems
+- Async pipelines
+- Editing workflows
+- Custom orchestrators
+- Custom modules
 
 Additional adapters and ecosystem integrations are maintained in separate repositories.
 
@@ -827,7 +788,6 @@ You can also find the full set of "how-to" guides in the repository docs folder 
 The first official adapter is the React adapter:
 
 - @etl-corestream/react — React integration (viewer components and helpers)
-
   - npm: https://www.npmjs.com/package/@etl-corestream/react
   - package: @etl-corestream/react
   - GitHub: https://github.com/cristianm-developer/ETLCoreStream-React
@@ -846,13 +806,13 @@ ETL CoreStream is fully open source.
 
 You are free to:
 
-* Fork
-* Extend
-* Create adapters
-* Contribute
-* Open issues
-* Improve documentation
-* Build integrations
+- Fork
+- Extend
+- Create adapters
+- Contribute
+- Open issues
+- Improve documentation
+- Build integrations
 
 Community contributions are welcome.
 
@@ -876,12 +836,11 @@ ETL CoreStream is evolving rapidly toward a stable v1 release.
 
 Current priorities include:
 
-* API stabilization
-* Adapter ecosystem expansion
-* Persistence optimization
-* Additional exporters
-* Stream optimizations
-* Documentation expansion
-* More recovery strategies
-* Additional environment presets
-
+- API stabilization
+- Adapter ecosystem expansion
+- Persistence optimization
+- Additional exporters
+- Stream optimizations
+- Documentation expansion
+- More recovery strategies
+- Additional environment presets

@@ -18,8 +18,7 @@ export type LayoutBase = {
     headers: LayoutHeader[];
     localSteps: LayoutLocalStep[];
     globalSteps: GlobalStep[];
-    exports: Record<string, {fn: (row: RowObject) => any, labelDicc?: Record<string, string>, callback?: (stream: ReadableStream) => Promise<void>}>
-
+    exports: Exporter[] // exporters are an array of Exporter objects (see src/shared/schemes/exporter.ts)
 
 }
 ```
