@@ -17,9 +17,6 @@ Built for resumable imports, async validation pipelines, real-time editing, and 
 ![browser](https://img.shields.io/badge/Browser-Friendly-orange)
 ![architecture](https://img.shields.io/badge/Architecture-Modular-purple)
 ![status](https://img.shields.io/badge/status-active_development-yellow)
-![npm downloads](https://img.shields.io/npm/dm/@etl-corestream/core)
-![bundle size](https://img.shields.io/bundlephobia/minzip/@etl-corestream/core)
-![GitHub stars](https://img.shields.io/github/stars/cristianm-developer/ETLCoreStream)
 
 </div>
 
@@ -820,6 +817,9 @@ Topics include:
 
 Additional adapters and ecosystem integrations are maintained in separate repositories.
 
+You can also find the full set of "how-to" guides in the repository docs folder on GitHub:
+[ETLCoreStream-Core/docs](https://github.com/cristianm-developer/ETLCoreStream-Core/tree/main/docs)
+
 ---
 
 # 🔌 Official Adapters
@@ -884,12 +884,4 @@ Current priorities include:
 * Documentation expansion
 * More recovery strategies
 * Additional environment presets
-
----
-
-# 📄 License
-
-MIT
-
-```
 

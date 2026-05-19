@@ -43,8 +43,8 @@ We welcome contributions in the following areas:
 - Ensure it:
   - Implements the appropriate interface (`i-*.ts`)
   - Follows stream-based design principles
-  - Includes comprehensive unit tests
-  - Handles chunking and resource efficiency (see guidelines below)
+- Tests are not required at this time; include examples or manual verification steps instead
+ - Handles chunking and resource efficiency (see guidelines below)
 
 ### 4. **Adapter Creation**
 
@@ -112,85 +112,16 @@ Before contributing, understand these core principles:
 
 If your contribution directly impacts **this repository's core**, follow these guidelines:
 
-### Unit Tests (Required)
+### Automated Tests (Not used)
 
-**All new code must include comprehensive unit tests.** This is non-negotiable.
+Automated test cases are not currently used in this repository. Please do not add test files or enforce test coverage in PRs at this time.
 
-#### Testing Guidelines
+If you want to provide verification for your changes, include:
+- Code examples demonstrating the feature
+- Manual verification steps or a short checklist in the PR description
+- Performance notes or benchmarks when relevant
 
-- **File naming**: `*.test.ts`
-- **Framework**: Vitest
-- **Scope**: Test your changes, not existing functionality (unless fixing bugs)
-- **Coverage**: Aim for reasonable coverage of your new code
-- **Test cases** should include:
-  - Happy path scenarios
-  - Edge cases (empty data, large datasets, null/undefined values)
-  - Error handling and recovery
-  - Stream behavior (completion, backpressure, cancellation)
-  - Chunking and resource constraints
-
-#### Example: Testing a Global Validator
-
-```ts
-// src/core/global-step-engine/validators/my-validator.test.ts
-import { describe, it, expect } from "vitest";
-import { MyValidator } from "./my-validator";
-
-describe("MyValidator", () => {
-  it("should validate rows in chunks without loading all into memory", async () => {
-    const validator = new MyValidator();
-    const rows = generateRows(10000);
-    const chunks: any[] = [];
-
-    // Create a mock stream
-    const stream = rowsToStream(rows);
-    const result = validator.validate(stream);
-
-    for await (const chunk of result) {
-      chunks.push(chunk);
-      // Verify memory usage is constant (example using process.memoryUsage())
-    }
-
-    expect(chunks.length).toBeGreaterThan(0);
-    expect(chunks.every((c) => c.rows.length > 0)).toBe(true);
-  });
-
-  it("should respect AbortSignal for cancellation", async () => {
-    const validator = new MyValidator();
-    const abortController = new AbortController();
-    const stream = infiniteStream(); // Never-ending stream
-
-    const resultPromise = validator.validate(stream, abortController.signal);
-
-    setTimeout(() => abortController.abort(), 100);
-
-    await expect(resultPromise).rejects.toThrow("abort");
-  });
-
-  it("should emit progress updates for long-running validations", async () => {
-    const validator = new MyValidator();
-    const progressUpdates: string[] = [];
-
-    validator.on("progress", (label, percent) => {
-      progressUpdates.push(`${label}: ${percent}%`);
-    });
-
-    const stream = rowsToStream(generateRows(1000));
-    await validator.validate(stream);
-
-    expect(progressUpdates.length).toBeGreaterThan(0);
-  });
-});
-```
-
-#### Run Tests
-
-```bash
-npm test                      # Run all tests
-npm test -- --watch          # Watch mode
-npm test -- path/to/file     # Test specific file
-npm test -- --coverage       # Coverage report
-```
+Keep in mind that build and lint checks should still succeed where applicable.
 
 ### Backward Compatibility
 
@@ -266,7 +197,7 @@ export interface IImporter {
 src/core/my-module/
 ├── i-my-module.ts           # Interface
 ├── main.ts                  # Implementation
-├── main.test.ts             # Unit tests
+├── main.test.ts             # Optional (not currently used)
 ├── schemes/                 # Shared types (if any)
 │   └── my-types.ts
 └── adapters/                # Optional: adapter implementations
@@ -346,7 +277,7 @@ If you modify any schema in `src/shared/schemes/`:
 1. **Version the schema** (e.g., `layout.v2.ts`)
 2. **Provide migration helpers** (e.g., `migrateLayoutV1ToV2()`)
 3. **Document the migration** in `docs/migration.md`
-4. **Add migration tests** to verify backward compatibility paths
+4. **Add migration verification steps** to verify backward compatibility paths
 
 ---
 
@@ -357,10 +288,9 @@ If you modify any schema in `src/shared/schemes/`:
 
 2. **Create your changes** following guidelines above
 
-3. **Test thoroughly**
+3. **Verify build & lint**
 
    ```bash
-   npm test                      # All tests pass
    npm run build                 # Build succeeds
    npm run lint                  # No linting errors (if applicable)
    ```
@@ -386,7 +316,7 @@ If you modify any schema in `src/shared/schemes/`:
    - Link to related issues/discussions
 
 6. **PR Review Expectations**
-   - Tests must pass
+   - Build and lint should succeed (if applicable)
    - No regressions in existing functionality
    - Code follows project style
    - Performance impact is minimal
@@ -421,7 +351,7 @@ If your module:
 
 1. Open an issue describing the module
 2. Discuss design and interface compliance
-3. Submit PR with full test coverage
+3. Submit PR with examples or verification steps
 4. Get approval from maintainers
 
 #### About External Dependencies in Core
@@ -460,7 +390,7 @@ If your module:
 1. Create your own repository (separate from ETL CoreStream)
 2. Implement the orchestrator interfaces in your adapter
 3. **In your repository's README and package.json, reference ETL CoreStream**
-4. Follow the same code style and testing practices
+4. Follow the same code style; testing practices are optional
 5. Publish as a standalone package
 
 #### Example: Publishing an Adapter Separately
@@ -536,13 +466,9 @@ If you need to make **significant, incompatible changes** to core architecture:
 
 ---
 
-## 📚 Code Examples & Testing
+## 📚 Code Examples
 
-When proposing new functionality, **always include examples**:
-
-1. **Unit test demonstrating the feature**
-2. **Example showing how to use it**
-3. **Performance benchmark** (if relevant)
+When proposing new functionality, include clear usage examples and any performance notes. Automated unit tests are not required in this repository at this time.
 
 ### Example Template
 
