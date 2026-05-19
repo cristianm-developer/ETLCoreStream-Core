@@ -13,6 +13,11 @@ import {
   globalStepPipeHandler,
   localStepPipeHandler,
 } from "./editing-row-handler";
+import {
+  loadRecoverPointHandler,
+  recoverPointHandler,
+  recoverPointUpdatingHandler,
+} from "./recover-point-handler";
 
 export type OrchestratorActors =
   | "persistenceCleaner"
@@ -27,7 +32,10 @@ export type OrchestratorActors =
   | "removingRowsHandler"
   | "editingRowHandler"
   | "localStepPipeHandler"
-  | "globalStepPipeHandler";
+  | "globalStepPipeHandler"
+  | "recoverPointUpdatingHandler"
+  | "recoverPointHandler"
+  | "loadRecoverPointHandler";
 
 export const ACTORS = {
   persistenceCleaner,
@@ -43,4 +51,7 @@ export const ACTORS = {
   editingRowHandler,
   localStepPipeHandler,
   globalStepPipeHandler,
+  recoverPointUpdatingHandler,
+  recoverPointHandler,
+  loadRecoverPointHandler,
 } as Record<OrchestratorActors, any>;

@@ -13,6 +13,7 @@ import { STEPS } from "../consts/steps";
 export type ImporterHandlerInput = {
   importerModule: IImportFileModule;
   file: File;
+  abortSignal: AbortSignal;
 };
 
 export const importerHandler = fromCallback<
@@ -23,28 +24,29 @@ export const importerHandler = fromCallback<
   | ProgressUpdatedEvent
   | FinishedStreamEvent
   | ErrorEvent
->(({ input, emit, self }) => {
-  const { importerModule, file } = input;
+>(({ input, sendBack, self }) => {
+  const { importerModule, file, abortSignal } = input;
 
   let isFinished = false;
 
   try {
     const progress = importerModule.progress;
-    const stream = importerModule.readFileStream(file);
+    const stream = importerModule.readFileStream(file, abortSignal);
     const totalEstimatedRows = importerModule.totalEstimatedRows;
 
     const instrumentedStream = stream.pipeThrough(
       new TransformStream({
         transform: (chunk, controller) => {
+          abortSignal.throwIfAborted();
           controller.enqueue(chunk);
         },
         flush: () => {
           isFinished = true;
-          emit({
+          sendBack({
             type: "FINISHED_STREAM",
             streamType: "importStream",
           });
-          emit({
+          sendBack({
             type: "PROGRESS_UPDATED",
             progress: { value: null, label: "Importing data" },
           });
@@ -52,16 +54,19 @@ export const importerHandler = fromCallback<
       })
     );
 
-    emit({ type: "STREAM_CREATED", stream: instrumentedStream });
+    sendBack({ type: "STREAM_CREATED", stream: instrumentedStream });
 
     progress.subscribe((progress) => {
       if (!isFinished) {
-        emit({ type: "PROGRESS_UPDATED", progress: { value: progress, label: "Importing data" } });
+        sendBack({
+          type: "PROGRESS_UPDATED",
+          progress: { value: progress, label: "Importing data" },
+        });
       }
     });
 
-    emit({ type: "ESTIMATED_ROWS_UPDATED", totalEstimatedRows: totalEstimatedRows });
+    sendBack({ type: "ESTIMATED_ROWS_UPDATED", totalEstimatedRows: totalEstimatedRows });
   } catch (error) {
-    emit(errorEventGen.unexpected(self, error as Error, STEPS.READING_DATA.IMPORTING_DATA));
+    sendBack(errorEventGen.unexpected(self, error as Error, STEPS.READING_DATA.IMPORTING_DATA));
   }
 });

@@ -8,11 +8,17 @@ export type RowsReaderInput = {
   viewerModule: IViewerModule;
   filter: RowFilter;
   pageNumber: number;
+  abortSignal: AbortSignal;
 };
 
 export const rowsReader = fromPromise<RowObject[], RowsReaderInput>(
   async ({ input }): Promise<RowObject[]> => {
-    const { persistenceModule, viewerModule, filter, pageNumber } = input;
-    return await viewerModule.getRowsWithPagination(persistenceModule, filter, pageNumber);
+    const { abortSignal, persistenceModule, viewerModule, filter, pageNumber } = input;
+    return await viewerModule.getRowsWithPagination(
+      persistenceModule,
+      filter,
+      pageNumber,
+      abortSignal
+    );
   }
 );

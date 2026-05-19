@@ -33,19 +33,20 @@ export const LocalStepFnsExample = {
       diccTransform: () => diccTransform(headerKey, { true: "1", false: "0" }),
     };
   },
-  validators: (headerKey: string) => {
+  validators: (headerKey: string, errorCode?: string) => {
     return {
-      notNull: () => notNull(headerKey),
-      onlyNumeric: () => onlyNumeric(headerKey),
-      regex: (regexPattern: string) => regex(headerKey, regexPattern),
-      minLength: (minLengthValue: number) => minLength(headerKey, minLengthValue),
-      maxLength: (maxLengthValue: number) => maxLength(headerKey, maxLengthValue),
-      minValue: (minValueValue: number) => minValue(headerKey, minValueValue),
-      maxValue: (maxValueValue: number) => maxValue(headerKey, maxValueValue),
-      notEmpty: notEmpty(headerKey),
-      inRange: (minValue: number, maxValue: number) => inRange(headerKey, minValue, maxValue),
-      inList: (list: string[]) => inList(headerKey, list),
-      notNegative: notNegative(headerKey),
+      notNull: () => notNull(headerKey, errorCode),
+      onlyNumeric: () => onlyNumeric(headerKey, errorCode),
+      regex: (regexPattern: string) => regex(headerKey, regexPattern, errorCode),
+      minLength: (minLengthValue: number) => minLength(headerKey, minLengthValue, errorCode),
+      maxLength: (maxLengthValue: number) => maxLength(headerKey, maxLengthValue, errorCode),
+      minValue: (minValueValue: number) => minValue(headerKey, minValueValue, errorCode),
+      maxValue: (maxValueValue: number) => maxValue(headerKey, maxValueValue, errorCode),
+      notEmpty: () => notEmpty(headerKey, errorCode),
+      inRange: (minValue: number, maxValue: number) =>
+        inRange(headerKey, minValue, maxValue, errorCode),
+      inList: (list: string[]) => inList(headerKey, list, errorCode),
+      notNegative: () => notNegative(headerKey, errorCode),
     };
   },
 };

@@ -14,36 +14,47 @@ export interface PersistenceHandlerInput {
   persistenceModule: IPersistenceModule;
   stream: ReadableStream;
   totalEstimatedRows: Signal<number | null>;
+  abortSignal: AbortSignal;
 }
 
 export const persistenceHandler = fromCallback<
   any,
   PersistenceHandlerInput,
   FirstChunkRawReadyEvent | ErrorEvent | ProgressUpdatedEvent | FinishedPersistenceEvent
->(({ input, emit, self }) => {
-  const { persistenceModule, stream, totalEstimatedRows } = input;
+>(({ input, sendBack, self }) => {
+  const { abortSignal, persistenceModule, stream, totalEstimatedRows } = input;
 
   const progress = persistenceModule.progress;
   let isFinished = false;
 
   try {
     persistenceModule
-      .saveStream(stream, totalEstimatedRows, () => emit({ type: "FIRST_CHUNK_RAW_READY" }))
+      .saveStream(
+        stream,
+        totalEstimatedRows,
+        () => sendBack({ type: "FIRST_CHUNK_RAW_READY" }),
+        abortSignal
+      )
       .then(() => {
         isFinished = true;
-        emit({ type: "PROGRESS_UPDATED", progress: { value: null, label: "Persisting data" } });
-        emit({ type: "FINISHED_PERSISTENCE" });
+        sendBack({ type: "PROGRESS_UPDATED", progress: { value: null, label: "Persisting data" } });
+        sendBack({ type: "FINISHED_PERSISTENCE" });
       })
       .catch((error) => {
-        emit(errorEventGen.unexpected(self, error as Error, STEPS.READING_DATA.PERSISTING_DATA));
+        sendBack(
+          errorEventGen.unexpected(self, error as Error, STEPS.READING_DATA.PERSISTING_DATA)
+        );
       });
 
     progress.subscribe((progress) => {
       if (!isFinished) {
-        emit({ type: "PROGRESS_UPDATED", progress: { value: progress, label: "Persisting data" } });
+        sendBack({
+          type: "PROGRESS_UPDATED",
+          progress: { value: progress, label: "Persisting data" },
+        });
       }
     });
   } catch (error) {
-    emit(errorEventGen.unexpected(self, error as Error, STEPS.READING_DATA.PERSISTING_DATA));
+    sendBack(errorEventGen.unexpected(self, error as Error, STEPS.READING_DATA.PERSISTING_DATA));
   }
 });

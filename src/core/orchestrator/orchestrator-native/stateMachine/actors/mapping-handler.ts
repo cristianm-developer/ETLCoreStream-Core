@@ -16,65 +16,72 @@ export type MappingHandlerInput = {
   stream: ReadableStream;
   layout: LayoutBase;
   totalEstimatedRows: Signal<number | null>;
+  abortSignal: AbortSignal;
 };
 
 export const mappingHandler = fromCallback<
   any,
   MappingHandlerInput,
   StreamCreatedEvent | ErrorEvent | FinishedStreamEvent | ProgressUpdatedEvent
->(({ input, emit, self }) => {
+>(({ input, sendBack, self }) => {
   let isFinished = false;
+  const { abortSignal } = input;
 
   try {
     const mappingModule = input.mappingModule;
     const progress = mappingModule.progress;
 
-    mappingModule.handleStream(input.stream, input.layout, input.totalEstimatedRows).then(
-      (stream) => {
-        const instrumentedStream = stream.pipeThrough(
-          new TransformStream({
-            transform: (chunk, controller) => {
-              try {
+    mappingModule
+      .handleStream(input.stream, input.layout, input.totalEstimatedRows, abortSignal)
+      .then(
+        (stream) => {
+          const instrumentedStream = stream.pipeThrough(
+            new TransformStream({
+              transform: (chunk, controller) => {
+                abortSignal.throwIfAborted();
                 controller.enqueue(chunk);
-              } catch (error) {
-                emit(
-                  errorEventGen.unexpected(self, error as Error, STEPS.READING_DATA.MAPPING_DATA)
-                );
-              }
-            },
-            flush: () => {
-              isFinished = true;
-              emit({ type: "FINISHED_STREAM", streamType: "mappingStream" });
-              emit({ type: "PROGRESS_UPDATED", progress: { value: null, label: "Mapping" } });
-            },
-          })
-        );
+              },
+              flush: () => {
+                isFinished = true;
+                sendBack({ type: "FINISHED_STREAM", streamType: "mappingStream" });
+                sendBack({ type: "PROGRESS_UPDATED", progress: { value: null, label: "Mapping" } });
+              },
+            })
+          );
 
-        emit({ type: "STREAM_CREATED", stream: instrumentedStream });
-      },
-      (error) => {
+          sendBack({ type: "STREAM_CREATED", stream: instrumentedStream });
+        },
+        (error) => {
+          throw error;
+        }
+      )
+      .catch((error) => {
         if (error instanceof Error) {
           const errorMessages = [
             "Cannot be mapped",
             "Headers are not valid",
             "No map found",
             "No rows to remap",
+            "Mapping cancelled",
           ];
           if (errorMessages.some((message) => error.message.includes(message))) {
-            emit(errorEventGen.expected(self, error as Error, STEPS.READING_DATA.MAPPING_DATA));
+            sendBack(errorEventGen.expected(self, error as Error, STEPS.READING_DATA.MAPPING_DATA));
+          } else {
+            sendBack(
+              errorEventGen.unexpected(self, error as Error, STEPS.READING_DATA.MAPPING_DATA)
+            );
           }
         } else {
-          emit(errorEventGen.unexpected(self, error as Error, STEPS.READING_DATA.MAPPING_DATA));
+          sendBack(errorEventGen.unexpected(self, error as Error, STEPS.READING_DATA.MAPPING_DATA));
         }
-      }
-    );
+      });
 
     progress.subscribe((progress) => {
       if (!isFinished) {
-        emit({ type: "PROGRESS_UPDATED", progress: { value: progress, label: "Mapping" } });
+        sendBack({ type: "PROGRESS_UPDATED", progress: { value: progress, label: "Mapping" } });
       }
     });
   } catch (error) {
-    emit(errorEventGen.unexpected(self, error as Error, STEPS.READING_DATA.MAPPING_DATA));
+    sendBack(errorEventGen.unexpected(self, error as Error, STEPS.READING_DATA.MAPPING_DATA));
   }
 });

@@ -16,36 +16,52 @@ export type LocalStepsHandlerInput = {
   stream: ReadableStream;
   layout: LayoutBase;
   totalEstimatedRows: Signal<number | null>;
+  abortSignal: AbortSignal;
 };
 
 export const localStepsHandler = fromCallback<
   any,
   LocalStepsHandlerInput,
   StreamCreatedEvent | ErrorEvent | ProgressUpdatedEvent | FinishedStreamEvent
->(({ input, emit, self }) => {
+>(({ input, sendBack, self }) => {
   try {
-    const { localStepEngine, stream, layout, totalEstimatedRows } = input;
+    const { abortSignal, localStepEngine, stream, layout, totalEstimatedRows } = input;
     const progress = localStepEngine.progress;
 
-    const handledStream = localStepEngine.handleStream(stream, layout, totalEstimatedRows);
+    const handledStream = localStepEngine.handleStream(
+      stream,
+      layout,
+      totalEstimatedRows,
+      abortSignal
+    );
     const instrumentedStream = handledStream.pipeThrough(
       new TransformStream({
         transform: (chunk, controller) => {
           try {
+            abortSignal.throwIfAborted();
             controller.enqueue(chunk);
           } catch (error) {
-            emit(
-              errorEventGen.unexpected(
-                self,
-                error as Error,
-                STEPS.READING_DATA.HANDLING_LOCAL_STEPS
-              )
+            const isExpected =
+              error instanceof Error && error.message === "Max error count reached";
+
+            sendBack(
+              isExpected
+                ? errorEventGen.expected(
+                    self,
+                    error as Error,
+                    STEPS.READING_DATA.HANDLING_LOCAL_STEPS
+                  )
+                : errorEventGen.unexpected(
+                    self,
+                    error as Error,
+                    STEPS.READING_DATA.HANDLING_LOCAL_STEPS
+                  )
             );
           }
         },
         flush: () => {
-          emit({ type: "FINISHED_STREAM", streamType: "localStepsStream" });
-          emit({
+          sendBack({ type: "FINISHED_STREAM", streamType: "localStepsStream" });
+          sendBack({
             type: "PROGRESS_UPDATED",
             progress: { value: null, label: "Handling Local Steps" },
           });
@@ -54,11 +70,13 @@ export const localStepsHandler = fromCallback<
     );
 
     progress.subscribe((value) => {
-      emit({ type: "PROGRESS_UPDATED", progress: { value, label: "Handling Local Steps" } });
+      sendBack({ type: "PROGRESS_UPDATED", progress: { value, label: "Handling Local Steps" } });
     });
 
-    emit({ type: "STREAM_CREATED", stream: instrumentedStream });
+    sendBack({ type: "STREAM_CREATED", stream: instrumentedStream });
   } catch (error) {
-    emit(errorEventGen.unexpected(self, error as Error, STEPS.READING_DATA.HANDLING_LOCAL_STEPS));
+    sendBack(
+      errorEventGen.unexpected(self, error as Error, STEPS.READING_DATA.HANDLING_LOCAL_STEPS)
+    );
   }
 });

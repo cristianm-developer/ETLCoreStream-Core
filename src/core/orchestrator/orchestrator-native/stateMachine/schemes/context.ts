@@ -1,6 +1,7 @@
 import type { ILoggerModule } from "@/core/logger/i-logger-module";
 import type { ProviderModule } from "@/core/provider/main";
 import type { FileMetrics, LayoutBase, RowObject } from "@/shared";
+import type { RecoverPoint } from "@/shared/schemes/recover-point";
 import type { ViewPaginationInfo } from "@/shared/schemes/view-pagination";
 import type { Signal } from "@preact/signals-core";
 
@@ -29,7 +30,10 @@ export interface OrchestratorContext {
   progress: { label: string; value: number | null }[] | null;
   totalEstimatedRows: Signal<number | null> | null;
 
-  initialProcessing: boolean | null;
+  initialPersistenceDone: boolean | null;
+  initialGlobalStepsDone: boolean | null;
+
+  initialProcessingDone: boolean | null;
   processingRows: boolean | null;
 
   mappingColumnMapEntries: [string, string][] | null;
@@ -45,6 +49,11 @@ export interface OrchestratorContext {
   } | null;
 
   step: string[];
+  abortController: AbortController;
+
+  checkRecoverPoint: boolean;
+  wantToRecoverPoint: boolean | null;
+  recoveryPoint: RecoverPoint | null;
 }
 
 export const EMPTY_CONTEXT: OrchestratorContext = {
@@ -64,7 +73,7 @@ export const EMPTY_CONTEXT: OrchestratorContext = {
   },
   progress: [],
   totalEstimatedRows: null,
-  initialProcessing: false,
+  initialProcessingDone: false,
   processingRows: false,
   mappingColumnMapEntries: null,
   viewPaginationInfo: {
@@ -76,4 +85,11 @@ export const EMPTY_CONTEXT: OrchestratorContext = {
   modules: null,
   settings: null,
   step: [],
+  abortController: new AbortController(),
+  initialGlobalStepsDone: false,
+  initialPersistenceDone: false,
+
+  checkRecoverPoint: false,
+  wantToRecoverPoint: null,
+  recoveryPoint: null,
 };

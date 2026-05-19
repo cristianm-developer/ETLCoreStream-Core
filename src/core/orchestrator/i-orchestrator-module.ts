@@ -5,6 +5,7 @@ import type { ProviderModule } from "../provider/main";
 import type { Notification } from "@/shared/schemes/notification";
 import type { FileMetrics, RowFilter, RowObject } from "@/shared";
 import type { ReadonlySignal } from "@preact/signals-core";
+import type { RecoverPoint } from "@/shared/schemes/recover-point";
 
 export interface IOrchestratorModule {
   initialize(provider: ProviderModule, id?: string): void;
@@ -31,6 +32,9 @@ export interface IOrchestratorModule {
   file: ReadonlySignal<File | null>;
   context$: Observable<any | null>;
   context: ReadonlySignal<any | null>;
+
+  recoveryPoint$: Observable<RecoverPoint | null>;
+  recoveryPoint: ReadonlySignal<RecoverPoint | null>;
 
   currentRows$: Observable<RowObject[] | null>;
   currentRows: ReadonlySignal<RowObject[] | null>;
@@ -81,6 +85,8 @@ export interface IOrchestratorModule {
   editRow(rowId: number, key: string, value: string): void;
 
   updateConfig(module: string, options: any): void;
+
+  recoverActionChoosen(action: "recover" | "skip"): void;
 
   /* utilities */
   cleanPersistence(): void;

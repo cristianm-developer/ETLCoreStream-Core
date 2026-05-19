@@ -3,7 +3,7 @@ import type { LocalStepValidator } from "@shared/schemes/local-step-validators";
 /**
  * Validator: Verifies that the value is not null/undefined
  */
-export const notNull = (headerKey: string): LocalStepValidator => ({
+export const notNull = (headerKey: string, errorCode?: string): LocalStepValidator => ({
   headerKey,
   name: "Not Null",
   fn: (value: string, _row: any) => ({
@@ -13,12 +13,13 @@ export const notNull = (headerKey: string): LocalStepValidator => ({
     value,
     step: "local",
   }),
+  errorCode,
 });
 
 /**
  * Validator: Verifies that the value contains only numeric characters
  */
-export const onlyNumeric = (headerKey: string): LocalStepValidator => ({
+export const onlyNumeric = (headerKey: string, errorCode?: string): LocalStepValidator => ({
   headerKey,
   name: "Only Numeric",
   fn: (value: string, _row: any) => {
@@ -31,6 +32,7 @@ export const onlyNumeric = (headerKey: string): LocalStepValidator => ({
       step: "local",
     };
   },
+  errorCode,
 });
 
 /**
@@ -39,9 +41,11 @@ export const onlyNumeric = (headerKey: string): LocalStepValidator => ({
 export const regex = (
   headerKey: string,
   pattern: string,
-  flags: string = ""
+  flags: string = "",
+  errorCode?: string
 ): LocalStepValidator => ({
   headerKey,
+  errorCode,
   name: "Regex Pattern",
   fn: (value: string, row: any, ...args: any[]) => {
     const regexPattern: string = args[0];
@@ -81,9 +85,14 @@ export const regex = (
 /**
  * Validator: Verifies that the value length does not exceed a maximum
  */
-export const maxLength = (headerKey: string, max: number): LocalStepValidator => ({
+export const maxLength = (
+  headerKey: string,
+  max: number,
+  errorCode?: string
+): LocalStepValidator => ({
   headerKey,
   name: "Max Length",
+  errorCode,
   fn: (value: string, row: any, ...args: any[]) => {
     const maxLen: number = args[0];
     if (maxLen === undefined || maxLen === null) {
@@ -110,9 +119,14 @@ export const maxLength = (headerKey: string, max: number): LocalStepValidator =>
 /**
  * Validator: Verifies that the value length meets a minimum
  */
-export const minLength = (headerKey: string, min: number): LocalStepValidator => ({
+export const minLength = (
+  headerKey: string,
+  min: number,
+  errorCode?: string
+): LocalStepValidator => ({
   headerKey,
   name: "Min Length",
+  errorCode,
   fn: (value: string, row: any, ...args: any[]) => {
     const minLen: number = args[0];
     if (minLen === undefined || minLen === null) {
@@ -139,9 +153,10 @@ export const minLength = (headerKey: string, min: number): LocalStepValidator =>
 /**
  * Validator: Verifies that the value is not empty (after trimming whitespace)
  */
-export const notEmpty = (headerKey: string): LocalStepValidator => ({
+export const notEmpty = (headerKey: string, errorCode?: string): LocalStepValidator => ({
   headerKey,
   name: "Not Empty",
+  errorCode,
   fn: (value: string, _row: any) => {
     const isValid = value !== null && value !== undefined && value.trim().length > 0;
     return {
@@ -157,9 +172,14 @@ export const notEmpty = (headerKey: string): LocalStepValidator => ({
 /**
  * Validator: Verifies that a numeric value does not exceed a maximum
  */
-export const maxValue = (headerKey: string, max: number): LocalStepValidator => ({
+export const maxValue = (
+  headerKey: string,
+  max: number,
+  errorCode?: string
+): LocalStepValidator => ({
   headerKey,
   name: "Max Value",
+  errorCode,
   fn: (value: string, row: any, ...args: any[]) => {
     const maxVal: number = args[0];
     if (maxVal === undefined || maxVal === null) {
@@ -196,8 +216,13 @@ export const maxValue = (headerKey: string, max: number): LocalStepValidator => 
 /**
  * Validator: Verifies that a numeric value meets a minimum
  */
-export const minValue = (headerKey: string, min: number): LocalStepValidator => ({
+export const minValue = (
+  headerKey: string,
+  min: number,
+  errorCode?: string
+): LocalStepValidator => ({
   headerKey,
+  errorCode,
   name: "Min Value",
   fn: (value: string, row: any, ...args: any[]) => {
     const minVal: number = args[0];
@@ -235,8 +260,14 @@ export const minValue = (headerKey: string, min: number): LocalStepValidator => 
 /**
  * Validator: Verifies that a numeric value is within a specified range
  */
-export const inRange = (headerKey: string, min: number, max: number): LocalStepValidator => ({
+export const inRange = (
+  headerKey: string,
+  min: number,
+  max: number,
+  errorCode?: string
+): LocalStepValidator => ({
   headerKey,
+  errorCode,
   name: "In Range",
   fn: (value: string, row: any, ...args: any[]) => {
     const minVal: number = args[0];
@@ -275,8 +306,13 @@ export const inRange = (headerKey: string, min: number, max: number): LocalStepV
 /**
  * Validator: Verifies that the value is one of the allowed values in a list
  */
-export const inList = (headerKey: string, allowedValues: string[]): LocalStepValidator => ({
+export const inList = (
+  headerKey: string,
+  allowedValues: string[],
+  errorCode?: string
+): LocalStepValidator => ({
   headerKey,
+  errorCode,
   name: "In List",
   fn: (value: string, row: any, ...args: any[]) => {
     const list: string[] = args[0];
@@ -304,8 +340,9 @@ export const inList = (headerKey: string, allowedValues: string[]): LocalStepVal
 /**
  * Validator: Verifies that a numeric value is not negative
  */
-export const notNegative = (headerKey: string): LocalStepValidator => ({
+export const notNegative = (headerKey: string, errorCode?: string): LocalStepValidator => ({
   headerKey,
+  errorCode,
   name: "Not Negative",
   fn: (value: string, _row: any) => {
     const numValue = parseFloat(value);

@@ -45,9 +45,13 @@ export class MappingModule implements IMappingModule {
     const [streamToMap, streamToGetRemap] = stream.tee();
 
     const columnMapEntriesResult = await this.awaitRemap(streamToGetRemap, layout, signal);
+    if (!columnMapEntriesResult) {
+      throw new Error("Mapping Error: No map found");
+    }
     columnMapEntries = columnMapEntriesResult;
 
     let lastProgress = 0;
+    this.progress.value = 0;
 
     const transformer = new TransformStream({
       transform: async (chunk, controller) => {

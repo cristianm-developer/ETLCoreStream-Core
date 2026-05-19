@@ -42,10 +42,12 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
     this.logger.updateStatus({ order, progress: 0, status: "running", step });
 
     const errorCount = { count: 0 };
-    const errorDicc: Record<string, ValidationError> = {};
+    const errorDicc: Record<number, ValidationError> = {};
 
     let totalRowsProcessed = 0;
     let lastProgress = 0;
+
+    this.progress.value = 0;
 
     const transformer = new TransformStream({
       transform: async (chunk, controller) => {
@@ -145,7 +147,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
     row: RowObject,
     errorCount: { count: number },
     signal?: AbortSignal,
-    errorDicc: Record<string, ValidationError> = {}
+    errorDicc: Record<number, ValidationError> = {}
   ) => {
     const { order } = step;
 
@@ -201,7 +203,7 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
       for (const validator of validators) {
         this.handleAbortSignal(signal);
 
-        const { headerKey, fn, args = [] } = validator;
+        const { headerKey, fn, args = [], errorCode } = validator;
         const cellValue = row.value[headerKey];
 
         try {
@@ -211,13 +213,13 @@ export class LocalStepsEngineModule implements ILocalStepsEngineModule {
             errorDicc[rowId] = {
               __rowId: rowId,
               headerKey,
-              validationCode: result.validationCode,
+              validationCode: errorCode || result.validationCode,
               message: result.message,
               value: cellValue,
               originalValue: row.__originalValue?.[headerKey],
               step: step.name,
             };
-            row.__isError = `${validator.headerKey}:${result.validationCode}`;
+            row.__isError = `${validator.headerKey}:${errorCode || result.validationCode}`;
             errorCount.count++;
             break;
           }

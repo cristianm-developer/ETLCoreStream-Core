@@ -1,32 +1,16 @@
-import { raise, setup } from "xstate";
+import { assign, raise } from "xstate";
 import { stateMachineInitializing } from "./states/state-machine-initializing";
 import type { OrchestratorContext } from "./schemes/context";
 import { EMPTY_CONTEXT } from "./schemes/context";
-import type { OrchestratorActions } from "./actions";
-import { ACTIONS } from "./actions";
-import type { OrchestratorEvents } from "./events";
 import { stateMachineReadingData } from "./states/state-machine-reading-data";
 import { stateMachineWaitingInteractions } from "./states/state-machine-waiting-interactions";
-import type { OrchestratorActors } from "./actors";
-import { ACTORS } from "./actors";
 import { logEventGen } from "./events/log";
 import { STEPS } from "./consts/steps";
 import { stateMachineEditing } from "./states/state-machine-editing";
-import type { OrchestratorGuards } from "./guards";
-import { GUARDS } from "./guards";
 import { stateMachineError } from "./states/state-machine-error";
 import { stateMachineResetting } from "./states/state-machine-resetting";
 import { defaultState } from "./actions/reset";
-
-export const mainStateMachineSetup = setup({
-  types: {
-    context: {} as OrchestratorContext,
-    events: {} as OrchestratorEvents,
-  },
-  actions: ACTIONS as Record<OrchestratorActions, any>,
-  actors: ACTORS as Record<OrchestratorActors, any>,
-  guards: GUARDS as Record<OrchestratorGuards, any>,
-});
+import { mainStateMachineSetup } from "./state-machine-setup";
 
 export const mainStateMachine = (orchestratorContext: Partial<OrchestratorContext>) => {
   return mainStateMachineSetup.createMachine({
@@ -76,6 +60,9 @@ export const mainStateMachine = (orchestratorContext: Partial<OrchestratorContex
       },
       RESET: {
         target: "#root.resetting",
+      },
+      ESTIMATED_ROWS_UPDATED: {
+        actions: assign(({ event }) => ({ totalEstimatedRows: event.totalEstimatedRows })),
       },
     },
   }) as any;

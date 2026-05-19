@@ -21,6 +21,8 @@ import type {
   ImportFileModuleOptions,
 } from "@/core/import-file/i-import-file-module";
 import type { IExporterModule, ExporterModuleOptions } from "@/core/exporter/i-exporter-module";
+import type { RecoverModuleOptions } from "../recover/i-recover-module";
+import type { IRecoverModule } from "../recover/i-recover-module";
 
 type Module<T, C> = new (logger: ILoggerModule, config: C) => T;
 type Logger<C> = new (config: C) => ILoggerModule;
@@ -29,6 +31,10 @@ export interface IProviderModuleConfig {
   logger: {
     module: Logger<LoggerModuleOptions>;
     options?: LoggerModuleOptions;
+  };
+  recover: {
+    module: Module<IRecoverModule, RecoverModuleOptions>;
+    options?: RecoverModuleOptions;
   };
   importer: {
     module: Module<IImportFileModule, ImportFileModuleOptions>;
@@ -63,6 +69,7 @@ export interface IProviderModuleConfig {
 export class ProviderModule {
   modules: {
     logger: ILoggerModule;
+    recover: IRecoverModule;
     importer: IImportFileModule;
     mapper: IMappingModule;
     persistence: IPersistenceModule;
@@ -74,6 +81,7 @@ export class ProviderModule {
 
   options: {
     logger?: LoggerModuleOptions;
+    recover?: RecoverModuleOptions;
     importer?: ImportFileModuleOptions;
     mapper?: MappingModuleOptions;
     localStepEngine?: LocalStepsEngineModuleOptions;
@@ -92,6 +100,7 @@ export class ProviderModule {
     this.modules = {
       logger,
       persistence,
+      recover: new config.recover.module(logger, config.recover.options ?? {}),
       importer: new config.importer.module(logger, config.importer.options ?? {}),
       mapper: new config.mapper.module(
         logger,
@@ -120,6 +129,7 @@ export class ProviderModule {
       globalStepEngine: config.globalStepEngine.options,
       exporter: config.exporter.options,
       viewer: config.viewer.options,
+      recover: config.recover.options,
     };
   }
 }

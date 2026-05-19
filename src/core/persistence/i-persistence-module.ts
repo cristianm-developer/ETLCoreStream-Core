@@ -3,6 +3,11 @@ import type { RowFilter } from "@/shared/schemes/persistent-filter";
 import type { RowObject } from "@/shared/schemes/row-object";
 import type { FileMetrics } from "@/shared/schemes/file-metrics";
 import type { Signal } from "@preact/signals-core";
+import type {
+  GetRowsPaginatedOptions,
+  GetRowsPaginatedResult,
+} from "@/shared/schemes/view-pagination";
+import type { RecoverPoint } from "@/shared/schemes/recover-point";
 
 export type PersistenceModuleOptions = {
   chunkSizeQtd?: number;
@@ -11,11 +16,13 @@ export type PersistenceModuleOptions = {
     rows: string;
     errors: string;
     metrics: string;
+    recoveryPoint: string;
   };
   storeKeys: {
     rows: string;
     errors: string;
     metrics: string;
+    recoveryPoint: string;
   };
 };
 
@@ -26,11 +33,13 @@ export const DEFAULT_PERSISTENCE_MODULE_OPTIONS: PersistenceModuleOptions = {
     rows: "rows",
     errors: "errors",
     metrics: "metrics",
+    recoveryPoint: "recoveryPoint",
   },
   storeKeys: {
     rows: "__rowId",
     errors: "__rowId",
     metrics: "fileName",
+    recoveryPoint: "fileName",
   },
 };
 
@@ -45,7 +54,12 @@ export interface IPersistenceModule {
     onFirstChunkReady?: (() => void) | null,
     signal?: AbortSignal | null
   ) => Promise<void>;
-  getRowsStream: (filter: RowFilter) => ReadableStream<{ rows: RowObject[] }>;
+  getRowsPaginated: (options: GetRowsPaginatedOptions) => Promise<GetRowsPaginatedResult>;
+  getRowsStream: (
+    filter: RowFilter,
+    abortSignal?: AbortSignal,
+    batchSize?: number
+  ) => ReadableStream<{ rows: RowObject[] }>;
   getErrorsStream: (filter: RowFilter) => ReadableStream<{ errors: ValidationError[] }>;
   clear: () => Promise<void>;
 
@@ -56,7 +70,10 @@ export interface IPersistenceModule {
   deleteRow: (id: number) => Promise<void>;
   deleteErrors: (ids: number[]) => Promise<void>;
 
-  updateMetrics: (fileName: string) => Promise<void>;
+  getRecoveryPoint: () => Promise<RecoverPoint | undefined | null>;
+  updateRecoveryPoint: (recoveryPoint: RecoverPoint) => Promise<void>;
+
+  updateMetrics: (fileName: string, filter?: RowFilter) => Promise<void>;
   getMetrics: (fileName: string) => Promise<FileMetrics | undefined>;
   updateOptions(options: Partial<PersistenceModuleOptions>): void;
 }

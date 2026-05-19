@@ -1,7 +1,7 @@
 import { assign, raise } from "xstate";
 import { STEPS } from "../consts/steps";
 import { logEventGen } from "../events/log";
-import { mainStateMachineSetup } from "../state-machine-root";
+import { mainStateMachineSetup } from "../state-machine-setup";
 import { errorEventGen } from "../events/error";
 import type { ExportEvent, RemoveRowEvent } from "../events/user-events";
 import type { OrchestratorContext } from "../schemes/context";
@@ -10,6 +10,12 @@ import type {
   GlobalStepPipeHandlerInput,
   LocalStepPipeHandlerInput,
 } from "../actors/editing-row-handler";
+import type { MetricsUpdatingHandlerInput } from "../actors/metrics-updating-handler";
+import type { ExporterHandlerInput } from "../actors/exporter-handler";
+import type { RemovingRowsHandlerInput } from "../actors/removing-rows-handler";
+import type { FileMetrics } from "@/shared";
+import type { RecoverPointUpdatingHandlerInput } from "../actors/recover-point-handler";
+import type { RecoverPoint } from "@/shared/schemes/recover-point";
 
 export const stateMachineEditing = mainStateMachineSetup.createStateConfig({
   id: "editing",
@@ -82,7 +88,8 @@ export const stateMachineEditing = mainStateMachineSetup.createStateConfig({
             exporterModule: context.modules!.exporter!,
             filter: context.viewPaginationInfo?.currentFilter ?? {},
             file: context.file,
-          };
+            abortSignal: context.abortController.signal,
+          } satisfies ExporterHandlerInput;
         },
         onDone: {
           target: "idle",
@@ -119,7 +126,7 @@ export const stateMachineEditing = mainStateMachineSetup.createStateConfig({
           return {
             rowId: event.rowId,
             persistenceModule: context.modules!.persistence!,
-          };
+          } satisfies RemovingRowsHandlerInput;
         },
         onError: {
           actions: [
@@ -129,7 +136,7 @@ export const stateMachineEditing = mainStateMachineSetup.createStateConfig({
           ],
         },
         onDone: {
-          target: "updatingMetrics",
+          target: "#root.working.editing.updatingMetrics",
         },
       },
       exit: [
@@ -170,7 +177,8 @@ export const stateMachineEditing = mainStateMachineSetup.createStateConfig({
                 value: context.editPayload?.value,
                 persistenceModule: context.modules!.persistence!,
                 viewerModule: context.modules!.viewer!,
-              } as EditingRowHandlerInput;
+                abortSignal: context.abortController.signal,
+              } satisfies EditingRowHandlerInput;
             },
             onError: {
               actions: [
@@ -193,7 +201,8 @@ export const stateMachineEditing = mainStateMachineSetup.createStateConfig({
                 localStepEngineModule: context.modules!.localStepEngine!,
                 persistenceModule: context.modules!.persistence!,
                 layout: context.layout!,
-              } as LocalStepPipeHandlerInput;
+                abortSignal: context.abortController.signal,
+              } satisfies LocalStepPipeHandlerInput;
             },
             onError: {
               actions: [
@@ -216,7 +225,8 @@ export const stateMachineEditing = mainStateMachineSetup.createStateConfig({
                 globalStepEngineModule: context.modules!.globalStepEngine!,
                 persistenceModule: context.modules!.persistence!,
                 layout: context.layout,
-              } as GlobalStepPipeHandlerInput;
+                abortSignal: context.abortController.signal,
+              } satisfies GlobalStepPipeHandlerInput;
             },
             onError: {
               actions: [
@@ -226,7 +236,7 @@ export const stateMachineEditing = mainStateMachineSetup.createStateConfig({
               ],
             },
             onDone: {
-              target: "updatingMetrics",
+              target: "#root.working.editing.updatingMetrics",
             },
           },
         },
@@ -241,29 +251,86 @@ export const stateMachineEditing = mainStateMachineSetup.createStateConfig({
         }),
       ],
     },
-
     updatingMetrics: {
+      initial: "updatingMetrics",
+
       entry: [
         raise(({ self }) =>
           logEventGen.info(self, "Updating metrics", STEPS.EDITING.UPDATING_METRICS)
         ),
         assign({ step: ({ context }) => [...context.step, STEPS.EDITING.UPDATING_METRICS] }),
       ],
-      invoke: {
-        src: "metricsUpdatingHandler",
-        input: ({ context }: { context: OrchestratorContext }) => ({
-          persistingModule: context.modules!.persistence!,
-          file: context.file,
-        }),
-        onError: {
-          actions: [
-            raise(({ self, event }) =>
-              errorEventGen.unexpected(self, event.error, STEPS.EDITING.UPDATING_METRICS)
-            ),
-          ],
+
+      states: {
+        updatingMetrics: {
+          invoke: {
+            src: "metricsUpdatingHandler",
+            input: ({ context }: { context: OrchestratorContext }) =>
+              ({
+                persistingModule: context.modules!.persistence!,
+                file: context.file,
+                viewerModule: context.modules!.viewer!,
+                filter: context.viewPaginationInfo?.currentFilter ?? {},
+              }) as MetricsUpdatingHandlerInput,
+            onError: {
+              actions: [
+                raise(({ self, event }) =>
+                  errorEventGen.unexpected(
+                    self,
+                    (event as unknown as ErrorEvent).error,
+                    STEPS.UPDATING_METRICS
+                  )
+                ),
+              ],
+            },
+            onDone: {
+              target: "updatingRecoverPoint",
+              actions: [
+                raise(({ self }) =>
+                  logEventGen.info(self, "Metrics updated", STEPS.UPDATING_METRICS)
+                ),
+                assign(({ event, context }) => {
+                  const result = event.output as { metrics: FileMetrics; totalPages: number };
+
+                  return {
+                    metrics: result.metrics,
+                    viewPaginationInfo: {
+                      currentPage: context.viewPaginationInfo?.currentPage ?? 1,
+                      totalPages: result.totalPages,
+                      currentFilter: context.viewPaginationInfo?.currentFilter ?? {},
+                    },
+                  };
+                }),
+              ],
+            },
+          },
         },
-        onDone: {
-          target: "idle",
+        updatingRecoverPoint: {
+          invoke: {
+            src: "recoverPointUpdatingHandler",
+            input: ({ context }: { context: OrchestratorContext }) =>
+              ({
+                persistenceModule: context.modules!.persistence!,
+                recoverModule: context.modules!.recover!,
+                metrics: context.metrics!,
+                layout: context.layout!,
+              }) satisfies RecoverPointUpdatingHandlerInput,
+            onDone: {
+              target: "#editing.idle",
+              actions: [assign(({ event }) => ({ recoveryPoint: event.output as RecoverPoint }))],
+            },
+            onError: {
+              actions: [
+                raise(({ self, event }) =>
+                  errorEventGen.unexpected(
+                    self,
+                    (event as unknown as ErrorEvent).error,
+                    STEPS.RECOVERING.UPDATING_RECOVERY_POINT
+                  )
+                ),
+              ],
+            },
+          },
         },
       },
       exit: [

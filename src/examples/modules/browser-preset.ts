@@ -1,3 +1,4 @@
+import type { ViewerModuleOptions } from "@/core";
 import { OrchestratorModule } from "@/core";
 import { ExporterNativeModule } from "@/core/exporter/exporter-native/main";
 import { DEFAULT_IMPORT_FILE_MODULE_OPTIONS } from "@/core/import-file/i-import-file-module";
@@ -8,13 +9,17 @@ import { DEFAULT_PERSISTENCE_MODULE_OPTIONS } from "@/core/persistence/i-persist
 import { PersistenceIndexDbModule } from "@/core/persistence/persistence-indexdb/main";
 import type { IProviderModuleConfig } from "@/core/provider/main";
 import { ProviderModule } from "@/core/provider/main";
+import { DEFAULT_RECOVER_MODULE_OPTIONS } from "@/core/recover/i-recover-module";
+import { RecoverNativeModule } from "@/core/recover/recover-native/main";
 import { GlobalStepsEngineModule } from "@/core/steps-engine/global-steps-engine/main";
 import {
   DEFAULT_STEPS_ENGINE_OPTIONS,
   LocalStepsEngineModule,
 } from "@/core/steps-engine/local-steps-engine/main";
 import { ViewerModule } from "@/core/viewer/viewer-native/main";
+import type { LayoutBase } from "@/shared";
 import type { LayoutHeader } from "@/shared/schemes/layout-header";
+import type { RecoverPoint } from "@/shared/schemes/recover-point";
 
 export interface BrowserProviderConfig {
   importer: {
@@ -28,6 +33,14 @@ export interface BrowserProviderConfig {
     onRemapFn?: (rowKeys: string[], headers: LayoutHeader[]) => Promise<[string, string][]>;
     preserveOriginalValue?: boolean;
   };
+  recover: {
+    checkRecoveryPoint?: boolean;
+    availableLayouts?: LayoutBase[];
+    recoveryPoint?: RecoverPoint;
+  };
+  viewer: {
+    defaultPageSize?: number;
+  };
   localStepEngine: {
     maxErrorCount?: number;
   };
@@ -40,6 +53,13 @@ export const BrowserProviderPreset = (config?: BrowserProviderConfig) => {
   const providerConfig: IProviderModuleConfig = {
     logger: {
       module: LoggerModule as any,
+    },
+    recover: {
+      module: RecoverNativeModule as any,
+      options: {
+        ...DEFAULT_RECOVER_MODULE_OPTIONS,
+        ...config?.recover,
+      },
     },
     importer: {
       module: ImportFilePapaparseModule as any,
@@ -74,6 +94,10 @@ export const BrowserProviderPreset = (config?: BrowserProviderConfig) => {
     },
     viewer: {
       module: ViewerModule as any,
+      options: {
+        defaultPageSize: config?.viewer?.defaultPageSize ?? 100,
+        defaultFilter: {},
+      } satisfies ViewerModuleOptions,
     },
     exporter: {
       module: ExporterNativeModule as any,

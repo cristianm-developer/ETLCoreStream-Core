@@ -2,13 +2,27 @@ import type { LoggerModule } from "@/core/logger/logger-native/main";
 import type { IPersistenceModule } from "@/core/persistence/i-persistence-module";
 import type { IViewerModule, EditRowPayload, ViewerModuleOptions } from "../i-viewer-module";
 import type { RowFilter } from "@/shared/schemes/persistent-filter";
-import type { RowObject } from "@/shared/schemes/row-object";
+import { isEqual } from "lodash-es";
+
+interface ViewState {
+  lastPageLoaded: number | null;
+  nextCursor: number | null;
+  prevCursor: number | null;
+  lastFilterLoaded: RowFilter | null;
+}
 
 export class ViewerModule implements IViewerModule {
   id: string = "viewer-native";
 
   private logger: LoggerModule;
   private options: ViewerModuleOptions;
+
+  private viewState: ViewState = {
+    lastPageLoaded: null,
+    nextCursor: null,
+    prevCursor: null,
+    lastFilterLoaded: null,
+  };
 
   constructor(logger: LoggerModule, options: ViewerModuleOptions) {
     this.logger = logger;
@@ -34,37 +48,46 @@ export class ViewerModule implements IViewerModule {
         this.id
       );
 
-      const innerFilter: RowFilter = {
-        fromRowId: 1,
-        toRowId: this.options.defaultPageSize,
-        ...filter,
-      };
+      this.viewState.lastFilterLoaded ??= {};
+
       pageNumber = pageNumber ?? 1;
 
       signal?.throwIfAborted();
 
-      if (pageNumber > 1) {
-        innerFilter.fromRowId = (pageNumber - 1) * this.options.defaultPageSize + 1;
-        innerFilter.toRowId = pageNumber * this.options.defaultPageSize;
-      }
+      let cursor: number | null = null;
+      let direction: "next" | "prev" = "next";
 
-      const rowsStream = persistenceModule.getRowsStream(innerFilter);
-      const reader = rowsStream.getReader();
-
-      const rows: RowObject[] = [];
-
-      try {
-        while (true) {
-          signal?.throwIfAborted();
-          const { done, value } = await reader.read();
-          if (done) break;
-          rows.push(...value.rows);
+      if (!isEqual(filter, this.viewState.lastFilterLoaded)) {
+        if (pageNumber != 1) {
+          throw new Error("Page Number must be 1 when a new filter is defined");
         }
-      } finally {
-        reader.releaseLock();
+      } else {
+        if (pageNumber > (this.viewState.lastPageLoaded ?? 0)) {
+          cursor = this.viewState.nextCursor;
+          direction = "next";
+        } else if (pageNumber < (this.viewState.lastPageLoaded ?? 0)) {
+          cursor = this.viewState.prevCursor;
+          direction = "prev";
+        }
       }
 
-      return rows;
+      const result = await persistenceModule.getRowsPaginated({
+        filter,
+        limit: this.options.defaultPageSize,
+        cursor,
+        direction,
+      });
+
+      signal?.throwIfAborted();
+
+      this.viewState = {
+        nextCursor: result.nextCursor,
+        prevCursor: result.prevCursor,
+        lastFilterLoaded: filter ?? {},
+        lastPageLoaded: pageNumber,
+      };
+
+      return result.rows;
     } catch (error) {
       this.logger.log(
         `Error fetching rows with pagination: ${(error as Error).message}`,

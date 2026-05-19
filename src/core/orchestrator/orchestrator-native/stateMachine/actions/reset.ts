@@ -1,5 +1,4 @@
 import { assign } from "xstate";
-import { mainStateMachineSetup } from "../state-machine-root";
 import type { OrchestratorContext } from "../schemes/context";
 
 export const defaultState: Partial<OrchestratorContext> = {
@@ -24,13 +23,17 @@ export const defaultState: Partial<OrchestratorContext> = {
     totalPages: 1,
     currentFilter: {},
   },
-  initialProcessing: false,
+  initialProcessingDone: false,
   step: [],
+  abortController: new AbortController(),
 };
 
-export const resetOrchestratorAction = mainStateMachineSetup.createAction(
-  assign(({ context }) => ({
+export const resetOrchestratorAction = assign(({ context }) => {
+  context.abortController.abort();
+
+  return {
     ...context,
     ...defaultState,
-  }))
-);
+    abortController: new AbortController(),
+  };
+});

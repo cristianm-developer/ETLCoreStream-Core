@@ -12,16 +12,21 @@ export type EditingRowHandlerInput = {
   value: string;
   persistenceModule: IPersistenceModule;
   viewerModule: IViewerModule;
+  abortSignal: AbortSignal;
 };
 
 export const editingRowHandler = fromPromise<void, EditingRowHandlerInput>(async ({ input }) => {
-  const { rowId, key, value, viewerModule, persistenceModule } = input;
+  const { abortSignal, rowId, key, value, viewerModule, persistenceModule } = input;
 
-  await viewerModule.editRow(persistenceModule, {
-    rowId,
-    headerKeyEdited: key,
-    newValue: value,
-  });
+  await viewerModule.editRow(
+    persistenceModule,
+    {
+      rowId,
+      headerKeyEdited: key,
+      newValue: value,
+    },
+    abortSignal
+  );
 });
 
 export type LocalStepPipeHandlerInput = {
@@ -29,14 +34,20 @@ export type LocalStepPipeHandlerInput = {
   localStepEngineModule: ILocalStepsEngineModule;
   persistenceModule: IPersistenceModule;
   layout: LayoutBase;
+  abortSignal: AbortSignal;
 };
 
 export const localStepPipeHandler = fromPromise<void, LocalStepPipeHandlerInput>(
   async ({ input }) => {
-    const { rowId, localStepEngineModule, persistenceModule, layout } = input;
+    const { abortSignal, rowId, localStepEngineModule, persistenceModule, layout } = input;
 
-    const stream = persistenceModule.getRowsStream({ rowIdIn: [rowId] });
-    const resultStream = await localStepEngineModule.handleStream(stream, layout, signal(1));
+    const stream = persistenceModule.getRowsStream({ rowIdIn: [rowId] }, abortSignal);
+    const resultStream = await localStepEngineModule.handleStream(
+      stream,
+      layout,
+      signal(1),
+      abortSignal
+    );
 
     await persistenceModule.saveStream(resultStream, signal(1));
   }
@@ -47,18 +58,25 @@ export type GlobalStepPipeHandlerInput = {
   globalStepEngineModule: IGlobalStepsEngineModule;
   persistenceModule: IPersistenceModule;
   layout: LayoutBase;
+  abortSignal: AbortSignal;
 };
 
 export const globalStepPipeHandler = fromPromise<void, GlobalStepPipeHandlerInput>(
   async ({ input }) => {
-    const { rowId, globalStepEngineModule, persistenceModule, layout } = input;
+    const { abortSignal, rowId, globalStepEngineModule, persistenceModule, layout } = input;
 
     for (const step of layout.globalSteps) {
       const removedErrorsAcc: number[] = [];
-      const rowIds: number[] | undefined = step.reprocessAllRowsOnChange ? undefined : [rowId];
+      const rowIds: number[] | undefined =
+        step.reprocessAllRowsOnChange == true ? undefined : [rowId];
 
       const stream = persistenceModule.getRowsStream({ ...step.filter.rows, rowIdIn: rowIds });
-      const resultStream = await globalStepEngineModule.handleStep(stream, step, signal(null));
+      const resultStream = await globalStepEngineModule.handleStep(
+        stream,
+        step,
+        signal(null),
+        abortSignal
+      );
       const parsedStream = resultStream.pipeThrough(
         new TransformStream({
           transform: async ({ rows, errors, removedErrors }: any, controller) => {

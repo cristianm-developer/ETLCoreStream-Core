@@ -1,8 +1,9 @@
 import { assign } from "xstate";
-import { mainStateMachineSetup } from "../state-machine-root";
+import type { OrchestratorContext } from "../schemes/context";
+import type { ProgressUpdatedEvent } from "../events/modules-events";
 
-export const updateProgressAction = mainStateMachineSetup.createAction(
-  assign(({ context, event }) => {
+export const updateProgressAction = assign(
+  ({ context, event }: { context: OrchestratorContext; event: ProgressUpdatedEvent }) => {
     if (event.type !== "PROGRESS_UPDATED") return context;
 
     const progressWithoutCurrent =
@@ -19,16 +20,14 @@ export const updateProgressAction = mainStateMachineSetup.createAction(
         progress: [...progressWithoutCurrent, event.progress],
       };
     }
-  })
+  }
 );
 
-export const updateEstimatedRowsAction = mainStateMachineSetup.createAction(
-  assign(({ context, event }) => {
-    if (event.type !== "ESTIMATED_ROWS_UPDATED") return context;
+export const updateEstimatedRowsAction = assign(({ context, event }) => {
+  if (event.type !== "ESTIMATED_ROWS_UPDATED") return context;
 
-    return {
-      ...context,
-      totalEstimatedRows: event.totalEstimatedRows,
-    };
-  })
-);
+  return {
+    ...context,
+    totalEstimatedRows: event.totalEstimatedRows,
+  };
+});

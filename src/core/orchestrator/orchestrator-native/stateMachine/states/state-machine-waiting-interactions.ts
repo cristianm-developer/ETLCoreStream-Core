@@ -1,11 +1,12 @@
-import { assign, raise } from "xstate";
+import { and, assign, raise } from "xstate";
 import { STEPS } from "../consts/steps";
 import { logEventGen } from "../events/log";
-import { mainStateMachineSetup } from "../state-machine-root";
+import { mainStateMachineSetup } from "../state-machine-setup";
 import type { OrchestratorContext } from "../schemes/context";
 import { errorEventGen } from "../events/error";
-import type { RowObject } from "@/shared";
+import type { FileMetrics, RowObject } from "@/shared";
 import type { ChangeFilterEvent, ChangePageEvent } from "../events/user-events";
+import type { MetricsUpdatingHandlerInput } from "../actors/metrics-updating-handler";
 
 export const stateMachineWaitingInteractions = mainStateMachineSetup.createStateConfig({
   id: "waitingInteractions",
@@ -30,7 +31,7 @@ export const stateMachineWaitingInteractions = mainStateMachineSetup.createState
       always: [
         {
           target: "readingRows",
-          guard: "isNotProccessingRows",
+          guard: and(["isNotProccessingRows", "isInitialProcessingDone"]),
         },
       ],
       exit: [
@@ -72,7 +73,7 @@ export const stateMachineWaitingInteractions = mainStateMachineSetup.createState
         onDone: [
           {
             actions: [assign({ currentRows: ({ event }) => event.output as RowObject[] })],
-            target: "waitingUser",
+            target: "waitingMetrics",
           },
         ],
       },
@@ -80,6 +81,30 @@ export const stateMachineWaitingInteractions = mainStateMachineSetup.createState
         assign({
           step: ({ context }) =>
             context.step?.filter((step) => step !== STEPS.WAITING_INTERACTIONS.READING_ROWS) ?? [],
+        }),
+      ],
+    },
+
+    waitingMetrics: {
+      entry: [
+        raise(({ self }) =>
+          logEventGen.info(self, "Waiting for metrics", STEPS.WAITING_INTERACTIONS.WAITING_METRICS)
+        ),
+        assign({
+          step: ({ context }) => [...context.step, STEPS.WAITING_INTERACTIONS.WAITING_METRICS],
+        }),
+      ],
+      always: [
+        {
+          target: "waitingUser",
+          guard: and(["isInitialProcessingDone", "hasMetrics"]),
+        },
+      ],
+      exit: [
+        assign({
+          step: ({ context }) =>
+            context.step?.filter((step) => step !== STEPS.WAITING_INTERACTIONS.WAITING_METRICS) ??
+            [],
         }),
       ],
     },
@@ -136,17 +161,68 @@ export const stateMachineWaitingInteractions = mainStateMachineSetup.createState
                   currentPage: 1,
                   totalPages: 1,
                 }),
+                currentPage: 1,
                 currentFilter: event.filter ?? {},
               }),
             }),
           ],
-          target: "readingRows",
+
+          target: "updatingMetrics",
         },
       },
       exit: [
         assign({
           step: ({ context }) =>
             context.step?.filter((step) => step !== STEPS.WAITING_INTERACTIONS.WAITING_USER) ?? [],
+        }),
+      ],
+    },
+    updatingMetrics: {
+      entry: [
+        raise(({ self }) => logEventGen.info(self, "Waiting for metrics", STEPS.UPDATING_METRICS)),
+        assign({
+          step: ({ context }) => [...context.step, STEPS.WAITING_INTERACTIONS.WAITING_METRICS],
+        }),
+      ],
+      invoke: {
+        src: "metricsUpdatingHandler",
+        input: ({ context }: { context: OrchestratorContext }) =>
+          ({
+            persistingModule: context.modules!.persistence!,
+            file: context.file,
+            viewerModule: context.modules!.viewer!,
+            filter: context.viewPaginationInfo?.currentFilter ?? {},
+          }) satisfies MetricsUpdatingHandlerInput,
+        onError: {
+          actions: [
+            raise(({ self, event }) =>
+              errorEventGen.unexpected(self, event.error, STEPS.EDITING.UPDATING_METRICS)
+            ),
+          ],
+        },
+        onDone: {
+          target: "readingRows",
+          actions: [
+            assign(({ event, context }) => {
+              const result = event.output as { metrics: FileMetrics; totalPages: number };
+
+              return {
+                metrics: result.metrics,
+                viewPaginationInfo: {
+                  currentPage: context.viewPaginationInfo?.currentPage ?? 1,
+                  totalPages: result.totalPages,
+                  currentFilter: context.viewPaginationInfo?.currentFilter ?? {},
+                },
+              };
+            }),
+          ],
+        },
+      },
+      exit: [
+        assign({
+          step: ({ context }) =>
+            context.step?.filter((step) => step !== STEPS.WAITING_INTERACTIONS.WAITING_METRICS) ??
+            [],
         }),
       ],
     },

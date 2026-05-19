@@ -1,4 +1,4 @@
-import type { ILoggerModule } from "@/core";
+import { STEPS, type ILoggerModule } from "@/core";
 import type { ProviderModule } from "@/core/provider/main";
 import type {
   FileMetrics,
@@ -25,9 +25,10 @@ import type {
   EditRowEvent,
   ExportEvent,
   RemoveRowEvent,
-  ResetEvent,
 } from "./stateMachine/events/user-events";
 import type { FileSelectedEvent, LayoutSelectedEvent } from "./stateMachine/events/waiting-inputs";
+import type { RecoverPoint } from "@/shared/schemes/recover-point";
+import type { WANT_TO_NOT_RECOVER, WANT_TO_RECOVER } from "./stateMachine/events/recovering";
 
 export class OrchestratorModule implements IOrchestratorModule {
   private contextSubject = new BehaviorSubject<OrchestratorContext | null>(null);
@@ -104,6 +105,11 @@ export class OrchestratorModule implements IOrchestratorModule {
   private stepSignal = signal<string[]>([]);
   step = computed(() => this.stepSignal.value);
 
+  private recoverPointSubject = new BehaviorSubject<RecoverPoint | null>(null);
+  recoveryPoint$: Observable<RecoverPoint | null> = this.recoverPointSubject.asObservable();
+  private recoverPointSignal = signal<RecoverPoint | null>(null);
+  recoveryPoint = computed(() => this.recoverPointSignal.value);
+
   private notificationSubject = new BehaviorSubject<Notification | null>(null);
   notification$: Observable<Notification | null> = this.notificationSubject.asObservable();
   logs$!: Observable<Log>;
@@ -116,6 +122,12 @@ export class OrchestratorModule implements IOrchestratorModule {
 
   private subscriptions = new Subscription();
 
+  private checkInitialContext = (context: OrchestratorContext) => {
+    if (Object.entries(context.modules).some(([k, v]) => !v)) {
+      throw new Error(`Module initialization is incomplete`);
+    }
+  };
+
   initialize = (provider: ProviderModule, id?: string): void => {
     this.id = id ?? crypto.randomUUID();
     this.provider = provider;
@@ -125,13 +137,35 @@ export class OrchestratorModule implements IOrchestratorModule {
 
     if (this.actor) return;
 
-    const context: Partial<OrchestratorContext> = {};
+    const context: Partial<OrchestratorContext> = {
+      logger: this.logger,
+      modules: this.provider.modules,
+      settings: this.provider.options,
+      abortController: new AbortController(),
+    };
 
     this.machine = mainStateMachine(context);
 
     this.actor = createActor(this.machine);
 
     const snapshot$: Observable<SnapshotFrom<typeof this.machine>> = from(this.actor);
+
+    this.actor.start();
+
+    const currentContext = this.actor.getSnapshot().context as OrchestratorContext;
+    this.checkInitialContext(currentContext);
+
+    this.subscriptions.add(
+      snapshot$
+        .pipe(
+          map((s) => s.context as OrchestratorContext),
+          distinctUntilChanged(isEqual)
+        )
+        .subscribe((val) => {
+          this.contextSubject.next(val);
+          this.contextSignal.value = val;
+        })
+    );
 
     this.subscriptions.add(
       snapshot$
@@ -270,6 +304,18 @@ export class OrchestratorModule implements IOrchestratorModule {
           this.stepSignal.value = val;
         })
     );
+
+    this.subscriptions.add(
+      snapshot$
+        .pipe(
+          map((s) => (s.context as OrchestratorContext).recoveryPoint),
+          distinctUntilChanged(isEqual)
+        )
+        .subscribe((val) => {
+          this.recoverPointSubject.next(val);
+          this.recoverPointSignal.value = val;
+        })
+    );
   };
 
   stop = () => {
@@ -277,21 +323,12 @@ export class OrchestratorModule implements IOrchestratorModule {
 
     this.logger.log("Orchestrator stopping...", "info", "stop", this.id);
 
-    this.actor.stop();
+    this.actor?.stop();
     this.subscriptions.unsubscribe();
 
     this.subscriptions = new Subscription();
 
-    this.contextSubject.complete();
-    this.stateSubject.complete();
-    this.metricsSubject.complete();
-    this.progressSubject.complete();
-    this.fileSubject.complete();
-    this.viewPaginationInfoSubject.complete();
-    this.errorsSubject.complete();
-    this.viewFilterSubject.complete();
-    this.currentRowsSubject.complete();
-    this.currentErrorsSubject.complete();
+    this.actor = undefined;
 
     this.logger.log("Orchestrator stopped", "info", "stop", this.id);
   };
@@ -321,7 +358,14 @@ export class OrchestratorModule implements IOrchestratorModule {
   };
 
   reset = (): void => {
-    this.actor!.send({ type: "RESET" } as ResetEvent);
+    const actorSnapshot = this.actor?.getSnapshot();
+    const context = actorSnapshot?.context as OrchestratorContext;
+    context.abortController?.abort();
+
+    Promise.resolve().then(() => {
+      this.stop();
+      this.initialize(this.provider, this.id);
+    });
   };
   selectFile = (file: File): void => {
     this.actor!.send({ type: "FILE_SELECTED", file } as FileSelectedEvent);
@@ -345,10 +389,13 @@ export class OrchestratorModule implements IOrchestratorModule {
     this.actor!.send({ type: "EDIT_ROW", rowId, key, value } as EditRowEvent);
   };
   updateConfig = (module: string, options: any): void => {
-    const currentState = this.actor!.getSnapshot();
+    const currentContext = this.actor!.getSnapshot().context as OrchestratorContext;
 
-    if (!currentState.matches("working.readingData.waitingLayout")) {
-      throw new Error(`Cannot update config in state ${JSON.stringify(currentState.value)}`);
+    if (
+      !currentContext.step.includes(STEPS.READING_DATA.WAITING_LAYOUT) &&
+      !currentContext.step.includes(STEPS.INITIALIZING_MACHINE)
+    ) {
+      throw new Error(`Cannot update config in state ${JSON.stringify(currentContext.step)}`);
     }
 
     const moduleToConfig = this.provider!.modules![module as keyof ProviderModule["modules"]];
@@ -361,5 +408,13 @@ export class OrchestratorModule implements IOrchestratorModule {
 
   cleanPersistence = async (): Promise<void> => {
     await this.provider.modules!.persistence!.clear();
+  };
+
+  recoverActionChoosen = (action: "recover" | "skip"): void => {
+    if (action === "recover") {
+      this.actor!.send({ type: "WANT_TO_RECOVER" } as WANT_TO_RECOVER);
+    } else {
+      this.actor!.send({ type: "WANT_TO_NOT_RECOVER" } as WANT_TO_NOT_RECOVER);
+    }
   };
 }

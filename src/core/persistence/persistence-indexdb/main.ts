@@ -7,6 +7,9 @@ import type { ValidationError } from "@/shared/schemes/local-step-validators";
 import type { FileMetrics } from "@/shared/schemes/file-metrics";
 import type { Signal } from "@preact/signals-core";
 import { signal } from "@preact/signals-core";
+import { isEqual } from "lodash-es";
+import type { GetRowsPaginatedOptions } from "@/shared/schemes/view-pagination";
+import type { RecoverPoint } from "@/shared/schemes/recover-point";
 
 export class PersistenceIndexDbModule implements IPersistenceModule {
   public id = "persistence-indexdb" as const;
@@ -53,6 +56,11 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
         if (!db.objectStoreNames.contains(this.options.storeNames.metrics)) {
           db.createObjectStore(this.options.storeNames.metrics, {
             keyPath: this.options.storeKeys.metrics,
+          });
+        }
+        if (!db.objectStoreNames.contains(this.options.storeNames.recoveryPoint)) {
+          db.createObjectStore(this.options.storeNames.recoveryPoint, {
+            keyPath: this.options.storeKeys.recoveryPoint,
           });
         }
       };
@@ -176,8 +184,124 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
     }
   };
 
-  getRowsStream(filter: RowFilter): ReadableStream<{ rows: RowObject[] }> {
-    const batchSize = this.options.chunkSizeQtd || 100;
+  getRecoveryPoint = async () => {
+    const db = await this.initDb();
+    const transaction = db.transaction(this.options.storeNames.recoveryPoint, "readonly");
+    const store = transaction.objectStore(this.options.storeNames.recoveryPoint);
+    return new Promise<RecoverPoint | undefined | null>((resolve, reject) => {
+      const request = store.openCursor();
+
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (cursor) {
+          resolve(cursor.value as RecoverPoint | undefined);
+        } else {
+          resolve(null);
+        }
+      };
+      request.onerror = () => {
+        reject(request.error);
+      };
+    });
+  };
+
+  updateRecoveryPoint = async (recoveryPoint: RecoverPoint) => {
+    const db = await this.initDb();
+    const transaction = db.transaction(this.options.storeNames.recoveryPoint, "readwrite");
+    const store = transaction.objectStore(this.options.storeNames.recoveryPoint);
+    const request = store.put(recoveryPoint);
+    request.onsuccess = () => {
+      this.logger.log("Recovery point updated", "debug", "updateRecoveryPoint", this.id);
+    };
+    request.onerror = () => {
+      this.logger.log("Failed to update recovery point", "error", "updateRecoveryPoint", this.id);
+      throw new Error("Failed to update recovery point");
+    };
+  };
+
+  getRowsPaginated = async (options: GetRowsPaginatedOptions) => {
+    const { filter = {}, limit = 100, cursor, direction = "next" } = options;
+
+    const db = await this.initDb();
+    const transaction = db.transaction(this.options.storeNames.rows, "readonly");
+    const store = transaction.objectStore(this.options.storeNames.rows);
+
+    let range: IDBKeyRange | null = null;
+
+    const lower = direction === "next" ? (cursor ?? filter.fromRowId) : filter.fromRowId;
+
+    const upper = direction === "prev" ? (cursor ?? filter.toRowId) : filter.toRowId;
+
+    if (lower != null && upper != null) {
+      range = IDBKeyRange.bound(lower, upper, lower === cursor, upper === cursor);
+    } else if (lower != null) {
+      range = IDBKeyRange.lowerBound(lower, lower === cursor);
+    } else if (upper != null) {
+      range = IDBKeyRange.upperBound(upper, upper === cursor);
+    }
+
+    const cursorDirection = direction == "next" ? "next" : "prev";
+    const rows: RowObject[] = [];
+
+    let firstCursor: number | null = null;
+    let lastCursor: number | null = null;
+    let hasExtraRow = false;
+
+    await new Promise<void>((resolve, reject) => {
+      const request = store.openCursor(range, cursorDirection);
+
+      request.onsuccess = () => {
+        const cursorResult = request.result;
+
+        if (!cursorResult) {
+          resolve();
+          transaction.abort();
+          return;
+        }
+
+        const row = cursorResult.value as RowObject;
+        const rowId = row.__rowId;
+
+        if (this.rowMatchesFilter(row, filter)) {
+          if (rows.length < limit) {
+            rows.push(row);
+
+            firstCursor ??= rowId;
+            lastCursor = rowId;
+          } else {
+            hasExtraRow = true;
+            resolve();
+            return;
+          }
+        }
+
+        cursorResult.continue();
+      };
+
+      request.onerror = () => {
+        reject(request.error);
+      };
+    });
+
+    if (direction == "prev") {
+      rows.reverse();
+    }
+
+    return {
+      rows,
+      nextCursor: rows.at(-1)?.__rowId ?? null,
+      prevCursor: rows.at(0)?.__rowId ?? null,
+      hasNextPage: direction === "next" ? hasExtraRow : cursor != null,
+      hasPrevPage: direction === "prev" ? hasExtraRow : cursor != null,
+    };
+  };
+
+  getRowsStream(
+    filter: RowFilter,
+    abortSignal?: AbortSignal,
+    batchSize?: number
+  ): ReadableStream<{ rows: RowObject[] }> {
+    const _batchSize = batchSize || this.options.chunkSizeQtd || 100;
     let lastRowId: number | null = null;
     let isFinished = false;
 
@@ -190,15 +314,20 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
           return;
         }
 
+        abortSignal?.throwIfAborted();
+
         try {
           const db = await self.initDb();
           const transaction = db.transaction(self.options.storeNames.rows, "readonly");
           const store = transaction.objectStore(self.options.storeNames.rows);
 
           let range: IDBKeyRange | null = null;
+
           if (lastRowId !== null) {
             range = IDBKeyRange.lowerBound(lastRowId, true);
-          } else if (filter.fromRowId && filter.toRowId) {
+          }
+
+          if (filter.fromRowId && filter.toRowId) {
             range = IDBKeyRange.bound(filter.fromRowId, filter.toRowId);
           } else if (filter.fromRowId) {
             range = IDBKeyRange.lowerBound(filter.fromRowId);
@@ -208,6 +337,9 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
 
           const batchRows: RowObject[] = [];
           const cursorRequest = store.openCursor(range);
+
+          const rowIdInSet = new Set<number>(filter.rowIdIn ?? []);
+          let findedRowsInSet = 0;
 
           await new Promise<void>((resolve, reject) => {
             cursorRequest.onsuccess = () => {
@@ -219,12 +351,29 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
               }
 
               const row = cursor.value;
+
+              const rowId = row[self.options.storeKeys.rows] as number;
+
+              if (rowIdInSet.size > 0 && findedRowsInSet >= rowIdInSet.size) {
+                isFinished = true;
+                resolve();
+                return;
+              }
+
+              if (rowIdInSet.size > 0 && !rowIdInSet.has(rowId)) {
+                cursor.continue();
+                return;
+              }
+
               if (self.rowMatchesFilter(row, filter)) {
                 batchRows.push(row);
+                if (rowIdInSet.size > 0) {
+                  findedRowsInSet++;
+                }
                 lastRowId = row[self.options.storeKeys.rows] as number;
               }
 
-              if (batchRows.length < batchSize) {
+              if (batchRows.length < _batchSize) {
                 cursor.continue();
               } else {
                 resolve();
@@ -251,6 +400,12 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
   private rowMatchesFilter = (row: RowObject, filter: RowFilter) => {
     if (filter.withErrors == true && !row.__isError) return false;
     if (filter.withoutErrors == true && row.__isError) return false;
+
+    if (filter.rowIdIn && filter.rowIdIn.length > 0 && !filter.rowIdIn.includes(row.__rowId))
+      return false;
+
+    if (filter.fromRowId && row.__rowId < filter.fromRowId) return false;
+    if (filter.toRowId && row.__rowId > filter.toRowId) return false;
 
     if (filter.fields && filter.fields.length > 0) {
       for (const fieldFilter of filter.fields) {
@@ -451,8 +606,9 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
             {
               storeName: this.options.storeNames.errors,
               fn: (store) => {
-                Object.entries(errorDicc).forEach(([rowId, error]) => {
-                  store.put({ [this.options.storeKeys.errors]: rowId, error });
+                const errorDiccParsed = errorDicc as Record<number, ValidationError>;
+                Object.entries(errorDiccParsed).forEach(([rowId, error]) => {
+                  store.put({ [this.options.storeKeys.errors]: Number(rowId), error });
                 });
               },
             },
@@ -535,7 +691,6 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
       };
       request.onblocked = () => {
         this.logger.log("Database is blocked", "error", "clear", this.id);
-        reject(new Error("Database is blocked"));
       };
     });
   };
@@ -604,7 +759,10 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
     ]);
   };
 
-  updateMetrics: (fileName: string) => Promise<void> = async (fileName: string) => {
+  updateMetrics: (fileName: string, filter?: RowFilter) => Promise<void> = async (
+    fileName: string,
+    filter
+  ) => {
     // 1. Get base metrics
     const metrics = (await this.getMetrics(fileName)) ?? {
       [this.options.storeKeys.metrics]: fileName,
@@ -617,35 +775,50 @@ export class PersistenceIndexDbModule implements IPersistenceModule {
 
     this.logger.log("Updating metrics for file: " + fileName, "debug", "updateMetrics", this.id);
 
-    // 2. Read transaction (counts)
-    await this.executeTransaction("readonly", [
-      {
-        storeName: this.options.storeNames.rows,
-        fn: (store) =>
-          new Promise<void>((resolve, reject) => {
-            const req = store.count();
-            req.onsuccess = () => {
-              totalRows = req.result;
-              resolve();
-            };
-            req.onerror = () => reject(req.error);
-          }),
-      },
-      {
-        storeName: this.options.storeNames.errors,
-        fn: (store) =>
-          new Promise<void>((resolve, reject) => {
-            const req = store.count();
-            req.onsuccess = () => {
-              totalErrors = req.result;
-              resolve();
-            };
-            req.onerror = () => reject(req.error);
-          }),
-      },
-    ]);
+    if (filter && !isEqual(filter, {})) {
+      const reader = this.getRowsStream(filter).getReader();
 
-    // 3. Write transaction
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          totalRows += value.rows.length;
+          totalErrors += value.rows.filter((e) => e.__isError).length;
+        }
+      } catch (error) {
+        throw new Error("Error counting filtered db");
+      } finally {
+        reader.releaseLock();
+      }
+    } else {
+      await this.executeTransaction("readonly", [
+        {
+          storeName: this.options.storeNames.rows,
+          fn: (store) =>
+            new Promise<void>((resolve, reject) => {
+              const req = store.count();
+              req.onsuccess = () => {
+                totalRows = req.result;
+                resolve();
+              };
+              req.onerror = () => reject(req.error);
+            }),
+        },
+        {
+          storeName: this.options.storeNames.errors,
+          fn: (store) =>
+            new Promise<void>((resolve, reject) => {
+              const req = store.count();
+              req.onsuccess = () => {
+                totalErrors = req.result;
+                resolve();
+              };
+              req.onerror = () => reject(req.error);
+            }),
+        },
+      ]);
+    }
     await this.executeTransaction("readwrite", [
       {
         storeName: this.options.storeNames.metrics,

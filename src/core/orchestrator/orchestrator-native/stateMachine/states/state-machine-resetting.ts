@@ -1,5 +1,5 @@
 import { assign, raise } from "xstate";
-import { mainStateMachineSetup } from "../state-machine-root";
+import { mainStateMachineSetup } from "../state-machine-setup";
 import { logEventGen } from "../events/log";
 import { STEPS } from "../consts/steps";
 

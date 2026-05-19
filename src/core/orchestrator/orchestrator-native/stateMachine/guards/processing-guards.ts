@@ -6,4 +6,7 @@ export const isNotProccessingRowsGuard = ({ context }: { context: OrchestratorCo
   !context.processingRows;
 
 export const isInitialProcessingDoneGuard = ({ context }: { context: OrchestratorContext }) =>
-  context.initialProcessing;
+  context.initialProcessingDone;
+
+export const hasMetricsGuard = ({ context }: { context: OrchestratorContext }) =>
+  context.metrics !== null;

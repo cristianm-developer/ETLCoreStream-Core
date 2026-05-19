@@ -11,10 +11,12 @@ export type ExporterHandlerInput = {
   exporterModule: IExporterModule;
   filter: RowFilter;
   file: File;
+  abortSignal: AbortSignal;
 };
 
 export const exporterHandler = fromPromise<void, ExporterHandlerInput>(async ({ input }) => {
-  const { exportId, layout, target, persistenceModule, exporterModule, filter, file } = input;
+  const { exportId, layout, target, persistenceModule, exporterModule, filter, file, abortSignal } =
+    input;
 
   const exportKey = exportId;
   const exportObj = layout.exports.find((e) => e.name === exportKey);
@@ -30,8 +32,8 @@ export const exporterHandler = fromPromise<void, ExporterHandlerInput>(async ({ 
     rowIdIn: undefined,
   };
 
-  const stream = persistenceModule.getRowsStream(currentFilter);
-  const resultStream = await exporterModule.exportStream(stream, exportObj.fn);
+  const stream = persistenceModule.getRowsStream(currentFilter, abortSignal);
+  const resultStream = await exporterModule.exportStream(stream, exportObj.fn, abortSignal);
 
   if (target == "Stream") {
     await exportObj.callback?.(resultStream);
@@ -39,7 +41,8 @@ export const exporterHandler = fromPromise<void, ExporterHandlerInput>(async ({ 
     await exporterModule.exportToCsv(
       resultStream,
       file.name + "_" + new Date().toISOString() + ".csv",
-      exportObj.labelDicc
+      exportObj.labelDicc,
+      abortSignal
     );
   }
 });

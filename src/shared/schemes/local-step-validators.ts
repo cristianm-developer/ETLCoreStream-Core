@@ -13,6 +13,7 @@ export type LocalStepValidator = {
     step: string;
   };
   args?: any[];
+  errorCode?: string;
 };
 
 export type ValidationError = {

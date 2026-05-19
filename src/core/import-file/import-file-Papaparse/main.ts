@@ -41,6 +41,7 @@ export class ImportFilePapaparseModule implements IImportFileModule {
   readFileStream = (file: File, signal?: AbortSignal): ReadableStream => {
     const validationResult = validateFile(file, this.config);
     if (validationResult?.isValid) {
+      this.progress.value = 0;
       const stream = this.createDataStream(file, signal);
       return stream;
     } else {

@@ -11,4 +11,5 @@ export type GlobalStepValidator = {
     removedValidationErrors: number[];
   }>;
   args?: any[];
+  errorCode?: string;
 };
