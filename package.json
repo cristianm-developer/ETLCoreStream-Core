@@ -1,17 +1,22 @@
 {
   "name": "@etl-corestream/core",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Headless ETL orchestration engine for the web. Process massive files with stream-friendly async operations, real-time validation/transformation, and jank-free performance using XState and Signals architecture.",
-  "license": "ISC",
-  "author": "Cristian Marin",
+  "license": "MIT",
+  "author": "cristianm-developer <cristianm-developer@users.noreply.github.com>",
+
   "type": "module",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cristianm-developer/ETLCoreStream-Core"
+    "url": "git+https://github.com/cristianm-developer/ETLCoreStream-Core.git"
   },
+  "bugs": {
+    "url": "https://github.com/cristianm-developer/ETLCoreStream-Core/issues"
+  },
+  "homepage": "https://github.com/cristianm-developer/ETLCoreStream-Core#readme",
   "publishConfig": {
     "access": "public"
   },
